@@ -557,7 +557,10 @@ function renderArtistItem(name) {
       showsHtml = '<div class="no-shows">Noch keine Auftrittsdaten</div>';
     }
     html += `<div class="artist-detail" id="detail-${name}">
-      <div class="detail-genre">${d.genre}${d.manual ? ' <span style="font-size:10px;background:#2a1a4a;color:#a080e0;border-radius:4px;padding:1px 5px;margin-left:4px">manuell</span>' : ''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="detail-genre">${d.genre}${d.manual ? ' <span style="font-size:10px;background:#2a1a4a;color:#a080e0;border-radius:4px;padding:1px 5px;margin-left:4px">manuell</span>' : ''}</div>
+        <button onclick="openEditModal('${nj}')" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer;flex-shrink:0">✏️ Bearbeiten</button>
+      </div>
       <div class="detail-section">
         <div class="detail-label">Rating Promo</div>
         <div class="stars" id="sr-rp-${name}">${starsHTML(name,'rp')}</div>
@@ -800,10 +803,14 @@ function exportKombiniertCSV() {
 
 // ── ADD ARTIST MODAL ──────────────────────────────────────────────────────────
 let formSeenVal = '';
+let editingArtistName = null; // null = new, string = editing
 
 function openAddModal() {
-  // reset form
+  editingArtistName = null;
+  document.getElementById('addModal').querySelector('.modal-title').textContent = 'Künstler*in hinzufügen';
+  document.getElementById('addModal').querySelector('.form-btn-save').textContent = 'Hinzufügen';
   document.getElementById('formName').value = '';
+  document.getElementById('formName').disabled = false;
   document.getElementById('formGenre').value = '';
   document.getElementById('formHerkunft').value = '';
   document.getElementById('formGeschlecht').value = 'mixed';
@@ -811,6 +818,23 @@ function openAddModal() {
   setFormSeen('');
   document.getElementById('addModal').classList.add('open');
   setTimeout(() => document.getElementById('formName').focus(), 300);
+}
+
+function openEditModal(name) {
+  const d = dataMap[name];
+  if (!d) return;
+  editingArtistName = name;
+  document.getElementById('addModal').querySelector('.modal-title').textContent = 'Künstler*in bearbeiten';
+  document.getElementById('addModal').querySelector('.form-btn-save').textContent = 'Speichern';
+  document.getElementById('formName').value = d.name;
+  document.getElementById('formName').disabled = true; // name can't be changed
+  document.getElementById('formGenre').value = d.genre || '';
+  document.getElementById('formHerkunft').value = d.herkunft || '';
+  document.getElementById('formGeschlecht').value = d.geschlecht || 'mixed';
+  document.getElementById('formNameError').style.display = 'none';
+  setFormSeen(d.gesehen || '');
+  document.getElementById('addModal').classList.add('open');
+  setTimeout(() => document.getElementById('formGenre').focus(), 300);
 }
 
 function closeAddModal() {
@@ -829,16 +853,31 @@ function setFormSeen(val) {
 }
 
 function saveNewArtist() {
+  // Edit mode
+  if (editingArtistName !== null) {
+    const d = dataMap[editingArtistName];
+    if (!d) return;
+    d.genre = document.getElementById('formGenre').value.trim();
+    d.herkunft = document.getElementById('formHerkunft').value.trim();
+    d.geschlecht = document.getElementById('formGeschlecht').value;
+    d.gesehen = formSeenVal;
+    saveToStorage();
+    render();
+    closeAddModal();
+    toast(`„${editingArtistName}" wurde aktualisiert ✓`);
+    return;
+  }
+
+  // Add mode
   const name = document.getElementById('formName').value.trim();
   const errEl = document.getElementById('formNameError');
   if (!name) { errEl.style.display = 'block'; return; }
   errEl.style.display = 'none';
 
   if (dataMap[name]) {
-    // artist already exists – ask user
     showConfirm(
       'Künstler*in bereits vorhanden',
-      `„${name}" ist bereits in der Liste. Sollen die bestehenden Daten überschrieben werden?`,
+      `„${name}" ist bereits in der Liste. Sollen die bestehenden Stammdaten überschrieben werden?`,
       [
         { label: 'Überschreiben', cls: 'confirm-btn-keep', action: () => { doSaveArtist(name, true); closeAddModal(); } },
         { label: 'Abbrechen', cls: 'confirm-btn-cancel', action: () => {} }
