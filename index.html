@@ -59,7 +59,7 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 
 /* MAIN SCROLL AREA */
 .view { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.view.hidden { display: none; }
+.view.hidden { display: none !important; }
 
 /* ARTIST LIST */
 .artist-item { border-bottom: 1px solid var(--border); }
@@ -184,7 +184,7 @@ input[type=file] { display: none; }
 </div>
 
 <!-- PROGRAMM VIEW -->
-<div id="view-programm" class="view hidden" style="display:flex;flex-direction:column">
+<div id="view-programm" class="view hidden" style="flex-direction:column">
   <div class="prog-filters">
     <div class="day-btns" id="dayBtns">
       <button class="day-btn active" data-day="Mi 17.09." onclick="toggleDay(this)">Mi 17.</button>
@@ -346,11 +346,16 @@ if ('serviceWorker' in navigator) {
 function switchTab(tab) {
   currentTab = tab;
   ['kuenstler','programm','io'].forEach(t => {
-    document.getElementById(`view-${t}`).classList.toggle('hidden', t !== tab);
+    const el = document.getElementById(`view-${t}`);
+    if (t === tab) {
+      el.classList.remove('hidden');
+      el.style.display = t === 'programm' ? 'flex' : '';
+    } else {
+      el.classList.add('hidden');
+      el.style.display = 'none';
+    }
     document.getElementById(`nav-${t}`).classList.toggle('active', t === tab);
   });
-  document.getElementById('view-programm').style.display = tab === 'programm' ? 'flex' : '';
-  document.getElementById('view-programm').style.flexDirection = tab === 'programm' ? 'column' : '';
   if (tab === 'programm') renderProg();
 }
 
