@@ -350,6 +350,18 @@ input[type=file] { display: none; }
       </div>
     </div>
 
+    <div class="io-section">
+      <div class="io-section-title">✏️ Änderungen für Code-Update</div>
+      <div class="io-btn" onclick="exportManualArtistsCSV()">
+        <div class="io-btn-icon">📋</div>
+        <div class="io-btn-text">
+          <div class="io-btn-label">Neue / geänderte Künstler</div>
+          <div class="io-btn-desc" id="manualExportDesc">Zum Einpflegen in den App-Code</div>
+        </div>
+        <div class="io-btn-arrow">⬇</div>
+      </div>
+    </div>
+
     <div class="info-box">
       <b>💾 Automatisches Speichern</b><br>
       Alle Bewertungen werden automatisch lokal auf diesem Gerät gespeichert und bleiben auch nach dem Schließen der App erhalten.<br><br>
@@ -358,6 +370,8 @@ input[type=file] { display: none; }
     </div>
 
     <div class="info-box" style="margin-top:0">
+      <b>✏️ Änderungen zentral einpflegen</b><br>
+      Neue oder geänderte Künstler mit „Neue / geänderte Künstler" exportieren und die CSV an Claude schicken – dann werden die Basisdaten in den App-Code eingepflegt und per GitHub-Update für alle Geräte verfügbar.<br><br>
       <b>📋 Auftritte-CSV Format</b><br>
       Spalten: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Künstler, Tag, Zeit, Location</code><br>
       Beispiel: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Fat Dog, Fr 19.09., 22:00, Große Freiheit 36</code>
@@ -405,7 +419,7 @@ function saveToStorage() {
   try {
     const payload = Object.values(dataMap)
       .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual)
-      .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl }));
+      .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl }));
     const auftrittePayload = auftritte.length ? auftritte : [];
     localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload }));
     document.getElementById('saveIndicator').textContent = '✓ gespeichert';
@@ -422,7 +436,7 @@ function loadFromStorage() {
       data.ratings.forEach(r => {
         // restore manual artists that aren't in RAW
         if (!dataMap[r.n] && r.manual) {
-          dataMap[r.n] = { name:r.n, genre:r.genre||'', herkunft:r.herkunft||'', geschlecht:r.geschlecht||'mixed', rbfUrl:r.rbfUrl||'', rp:0, rl:0, gesehen:'', customUrl:'', manual:true };
+          dataMap[r.n] = { name:r.n, genre:r.genre||'', herkunft:r.herkunft||'', geschlecht:r.geschlecht||'mixed', rbfUrl:r.rbfUrl||'', rp:0, rl:0, gesehen:'', customUrl:'', manual:true, edited:false };
         }
         if (dataMap[r.n]) {
           dataMap[r.n].rp = Math.min(r.rp || 0, MAX);
@@ -430,6 +444,7 @@ function loadFromStorage() {
           dataMap[r.n].gesehen = r.s || '';
           dataMap[r.n].customUrl = r.u || '';
           dataMap[r.n].manual = r.manual || false;
+          dataMap[r.n].edited = r.edited || false;
         }
       });
     }
@@ -460,6 +475,7 @@ function switchTab(tab) {
     document.getElementById(`nav-${t}`).classList.toggle('active', t === tab);
   });
   if (tab === 'programm') renderProg();
+  if (tab === 'io') updateManualExportDesc();
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
@@ -558,7 +574,7 @@ function renderArtistItem(name) {
     }
     html += `<div class="artist-detail" id="detail-${name}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div class="detail-genre">${d.genre}${d.manual ? ' <span style="font-size:10px;background:#2a1a4a;color:#a080e0;border-radius:4px;padding:1px 5px;margin-left:4px">manuell</span>' : ''}</div>
+        <div class="detail-genre">${d.genre}${d.manual ? ' <span style="font-size:10px;background:#2a1a4a;color:#a080e0;border-radius:4px;padding:1px 5px;margin-left:4px">manuell</span>' : ''}${d.edited ? ' <span style="font-size:10px;background:#1a2a1a;color:#80c080;border-radius:4px;padding:1px 5px;margin-left:4px">geändert</span>' : ''}</div>
         <button onclick="openEditModal('${nj}')" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer;flex-shrink:0">✏️ Bearbeiten</button>
       </div>
       <div class="detail-section">
@@ -861,6 +877,7 @@ function saveNewArtist() {
     d.herkunft = document.getElementById('formHerkunft').value.trim();
     d.geschlecht = document.getElementById('formGeschlecht').value;
     d.gesehen = formSeenVal;
+    if (!d.manual) d.edited = true; // mark as edited if not already manual
     saveToStorage();
     render();
     closeAddModal();
@@ -935,7 +952,30 @@ function closeConfirm() {
   document.getElementById('confirmDialog').classList.remove('open');
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
+function exportManualArtistsCSV() {
+  // collect manually added artists AND artists whose stammdaten were edited
+  const changed = Object.values(dataMap).filter(d => d.manual || d.edited);
+  if (!changed.length) {
+    toast('Keine neuen oder geänderten Künstler vorhanden.', false);
+    return;
+  }
+  const header = ['Aktion','Name','Genre','Herkunft','Geschlecht','RBF-URL'];
+  const rows = changed.map(d => [
+    d.manual ? 'NEU' : 'GEÄNDERT',
+    d.name, d.genre, d.herkunft, d.geschlecht,
+    d.customUrl || d.rbfUrl
+  ].map(csvQ).join(','));
+  download([header.join(','), ...rows].join('\n'), 'RBF2026_Aenderungen.csv');
+  toast(`${changed.length} Änderung(en) exportiert ✓`);
+}
+
+function updateManualExportDesc() {
+  const changed = Object.values(dataMap).filter(d => d.manual || d.edited);
+  const el = document.getElementById('manualExportDesc');
+  if (el) el.textContent = changed.length
+    ? `${changed.length} neue/geänderte Künstler*innen bereit`
+    : 'Noch keine Änderungen vorhanden';
+}
 loadFromStorage();
 buildTimeDropdowns();
 render();
