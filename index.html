@@ -373,8 +373,8 @@ input[type=file] { display: none; }
       <b>✏️ Änderungen zentral einpflegen</b><br>
       Neue oder geänderte Künstler mit „Neue / geänderte Künstler" exportieren und die CSV an Claude schicken – dann werden die Basisdaten in den App-Code eingepflegt und per GitHub-Update für alle Geräte verfügbar.<br><br>
       <b>📋 Auftritte-CSV Format</b><br>
-      Spalten: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Künstler, Tag, Zeit, Location</code><br>
-      Beispiel: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Fat Dog, Fr 19.09., 22:00, Große Freiheit 36</code>
+      Spalten: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Künstler, Tag, Zeit, Ende, Location</code> (Ende optional)<br>
+      Beispiel: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Fat Dog, Fr 19.09., 22:00, 22:45, Große Freiheit 36</code>
     </div>
   </div>
 </div>
@@ -568,7 +568,7 @@ function renderArtistItem(name) {
     let showsHtml = '';
     if (shows.length) {
       showsHtml = shows.sort((a,b) => a.day.localeCompare(b.day)||a.time.localeCompare(b.time))
-        .map(s => `<div class="show-row"><div class="show-day">${s.day}</div><div class="show-time">${s.time}</div><div class="show-loc">${s.location}</div></div>`).join('');
+        .map(s => `<div class="show-row"><div class="show-day">${s.day}</div><div class="show-time">${s.time}${s.endTime ? '–' + s.endTime : ''}</div><div class="show-loc">${s.location}</div></div>`).join('');
     } else {
       showsHtml = '<div class="no-shows">Noch keine Auftrittsdaten</div>';
     }
@@ -676,7 +676,7 @@ function renderProg() {
     const d = dataMap[a.name];
     const gc = d ? d.geschlecht === 'männlich' ? 'b-m' : d.geschlecht === 'weiblich' ? 'b-w' : 'b-x' : '';
     html += `<div class="prog-item">
-      <div class="prog-time-col">${a.time}</div>
+      <div class="prog-time-col">${a.time}${a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : ''}</div>
       <div class="prog-info">
         <div class="prog-name">${a.name}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
@@ -771,14 +771,15 @@ function importAuftrittCSV(event) {
     const h = p.header;
     const iN = h.findIndex(x => x.includes('künstler') || x === 'name');
     const iD = h.findIndex(x => x.includes('tag') || x.includes('datum'));
-    const iT = h.findIndex(x => x.includes('zeit') || x.includes('uhrzeit') || x.includes('time'));
+    const iT = h.findIndex(x => (x.includes('zeit') || x.includes('uhrzeit') || x.includes('time')) && !x.includes('ende') && !x.includes('end') && !x.includes('bis'));
+    const iE = h.findIndex(x => x.includes('ende') || x.includes('end') || x.includes('bis'));
     const iL = h.findIndex(x => x.includes('location') || x.includes('ort'));
     if ([iN,iD,iT,iL].includes(-1)) { toast('Benötigt: Künstler, Tag, Zeit, Location', false); return; }
     auftritte = []; let ok = 0, skip = 0;
     p.rows.forEach(r => {
       const name = r[h[iN]]; if (!name) return;
       if (!dataMap[name]) skip++;
-      auftritte.push({ name, day: r[h[iD]], time: r[h[iT]], location: r[h[iL]] });
+      auftritte.push({ name, day: r[h[iD]], time: r[h[iT]], endTime: iE > -1 ? (r[h[iE]] || '') : '', location: r[h[iL]] });
       ok++;
     });
     updateLocFilter(); saveToStorage(); render();
@@ -802,16 +803,16 @@ function exportKuenstlerCSV() {
 }
 function exportAuftritteCSV() {
   if (!auftritte.length) { toast('Keine Auftrittsdaten vorhanden.', false); return; }
-  const header = ['Künstler','Tag','Zeit','Location'];
-  const rows = auftritte.map(a => [a.name,a.day,a.time,a.location].map(csvQ).join(','));
+  const header = ['Künstler','Tag','Zeit','Ende','Location'];
+  const rows = auftritte.map(a => [a.name,a.day,a.time,a.endTime||'',a.location].map(csvQ).join(','));
   download([header.join(','), ...rows].join('\n'), 'RBF2026_Auftritte.csv');
   toast('Auftritte-CSV exportiert ✓');
 }
 function exportKombiniertCSV() {
   const h1 = ['Künstler','Genre','Herkunft','Geschlecht','Rating Promo (1-5)','Rating Listening (1-5)','Gesehen','RBF-Link','Link individuell'];
   const r1 = Object.values(dataMap).map(d => [d.name,d.genre,d.herkunft,d.geschlecht,d.rp||'',d.rl||'',d.gesehen,d.rbfUrl,d.customUrl?'ja':''].map(csvQ).join(','));
-  const h2 = ['Künstler','Tag','Zeit','Location'];
-  const r2 = auftritte.map(a => [a.name,a.day,a.time,a.location].map(csvQ).join(','));
+  const h2 = ['Künstler','Tag','Zeit','Ende','Location'];
+  const r2 = auftritte.map(a => [a.name,a.day,a.time,a.endTime||'',a.location].map(csvQ).join(','));
   const csv = ['### RBF2026 – Künstler ###', h1.join(','), ...r1, '', '### RBF2026 – Auftritte ###', h2.join(','), ...(r2.length ? r2 : ['(keine Auftrittsdaten)'])].join('\n');
   download(csv, 'RBF2026_Komplett.csv');
   toast('Kombinierte CSV exportiert ✓');
