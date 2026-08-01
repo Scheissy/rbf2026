@@ -85,6 +85,11 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .star.on { color: var(--accent); }
 .star.on:active { color: #c0392b; }
 .stars-sm .star { font-size: 17px; }
+.star-show.on { color: #b388ff; }
+.star-show.on:active { color: #9060e0; }
+.prog-showrating-summary { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: #b388ff; font-size: 11px; }
+.show-mini-star { font-size: 11px; color: var(--text3); }
+.show-mini-star.on { color: #b388ff; }
 .seen-btns { display: flex; gap: 6px; }
 .seen-btn { flex: 1; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
 .seen-btn.active-ja { background: #0a3a1a; border-color: var(--green); color: var(--green); }
@@ -92,11 +97,12 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .detail-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--accent); text-decoration: none; margin-top: 2px; }
 .detail-link:active { opacity: 0.7; }
 .shows-list { margin-top: 4px; }
-.show-row { display: flex; gap: 8px; font-size: 12px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.show-row { display: flex; flex-wrap: nowrap; gap: 8px; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); align-items: center; }
 .show-row:last-child { border-bottom: none; }
 .show-day { color: var(--text2); width: 80px; flex-shrink: 0; }
 .show-time { color: var(--text); width: 96px; flex-shrink: 0; white-space: nowrap; }
-.show-loc { color: var(--accent); flex: 1; }
+.show-loc { color: var(--accent); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.show-row .stars { flex-shrink: 0; }
 .no-shows { font-size: 12px; color: var(--text3); font-style: italic; }
 
 /* PROG VIEW */
@@ -104,7 +110,7 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .day-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .day-btn { flex: 1; min-width: 60px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; }
 .day-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
-.prog-row2 { display: flex; gap: 8px; align-items: center; }
+.prog-row2 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .prog-rating-filter { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); flex-shrink: 0; }
 .prog-rating-filter-label { font-size: 12px; color: var(--text3); }
 .prog-hidden-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; }
@@ -126,6 +132,11 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .prog-detail { padding: 2px 12px 12px 66px; border-bottom: 1px solid var(--border); background: var(--surface2); }
 .prog-detail.collapsed { display: none; }
 .prog-detail-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; color: var(--text2); }
+.prog-detail-cols { display: flex; gap: 14px; align-items: flex-start; }
+.prog-detail-main { flex: 1; min-width: 0; }
+.prog-detail-side { flex-shrink: 0; border-left: 1px solid var(--border); padding-left: 14px; padding-top: 1px; }
+.prog-detail-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text3); margin-bottom: 5px; }
+.prog-detail-side-stars { flex-wrap: nowrap; white-space: nowrap; }
 .prog-detail-label { width: 70px; flex-shrink: 0; color: var(--text3); }
 .prog-detail-link { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--accent); text-decoration: none; }
 .prog-star-group { font-size: 10px; color: var(--text3); display: flex; align-items: center; gap: 3px; }
@@ -303,6 +314,10 @@ input[type=file] { display: none; }
       <option value="ausgeblendet">🙈 Ausgeblendete</option>
       <option value="alle">Alle</option>
     </select>
+    <div class="prog-rating-filter">
+      <span class="prog-rating-filter-label">Auftritt:</span>
+      <div class="stars stars-sm" id="fKuenstlerShowRatingStars"></div>
+    </div>
   </div>
   <div class="statsbar" id="stats"></div>
   <div id="artistList"></div>
@@ -324,9 +339,15 @@ input[type=file] { display: none; }
     </div>
     <div class="prog-row2">
       <div class="prog-rating-filter">
-        <span class="prog-rating-filter-label">Min.:</span>
+        <span class="prog-rating-filter-label">Künstler Ø:</span>
         <div class="stars stars-sm" id="fProgRatingStars"></div>
       </div>
+      <div class="prog-rating-filter">
+        <span class="prog-rating-filter-label">Auftritt:</span>
+        <div class="stars stars-sm" id="fProgShowRatingStars"></div>
+      </div>
+    </div>
+    <div class="prog-row2">
       <select id="fProgStatus" onchange="renderProg()">
         <option value="">Alle Status</option>
         <option value="ja">✓ Gesehen</option>
@@ -476,6 +497,12 @@ let auftritte = defaultAuftritte();
 let expandedRows = new Set();
 let smartProgDefaultsApplied = false;
 let progRatingFilter = 0; // Mindestbewertung im Programm-Filter (0 = alle)
+// Auftritts-Bewertung: hängt an der konkreten Show (Tag+Zeit+Location), nicht am Künstler.
+// Fließt bewusst NICHT in den Künstler-Bewertungsdurchschnitt (rp/rl) ein.
+let showRatings = {};
+let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
+let kuenstlerShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Künstlerübersicht-Filter (0 = alle)
+function showKey(a) { return `${a.name}|${a.day}|${a.time}|${a.location}`; }
 let currentTab = 'kuenstler';
 let sortCol = 'name', sortDir = 1;
 
@@ -486,7 +513,7 @@ function saveToStorage() {
       .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet)
       .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false }));
     const auftrittePayload = auftritte.length ? auftritte : [];
-    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, showRatings }));
     document.getElementById('saveIndicator').textContent = '✓ gespeichert';
     setTimeout(() => document.getElementById('saveIndicator').textContent = '', 2000);
   } catch(e) { console.warn('Storage error', e); }
@@ -518,6 +545,7 @@ function loadFromStorage() {
       auftritte = data.auftritte;
       updateLocFilter();
     }
+    if (data.showRatings) showRatings = data.showRatings;
   } catch(e) { console.warn('Load error', e); }
 }
 
@@ -579,6 +607,10 @@ function getFiltered() {
     if (fHerkunft && !splitTags(d.herkunft).includes(fHerkunft)) return false;
     if (fHidden === 'sichtbar' && d.ausgeblendet) return false;
     if (fHidden === 'ausgeblendet' && !d.ausgeblendet) return false;
+    if (kuenstlerShowRatingFilter > 0) {
+      const hasMatch = auftritte.some(a => a.name === d.name && (showRatings[showKey(a)] || 0) >= kuenstlerShowRatingFilter);
+      if (!hasMatch) return false;
+    }
     return true;
   });
 }
@@ -636,6 +668,36 @@ function progStarsHTML(rid, name, field) {
     return `<span class="star${isOn ? ' on' : ''}" onclick="setProgRating('${rid}','${name}','${field}',${n})">★</span>`;
   }).join('');
 }
+// Auftritts-Bewertung: eigenständige Sterne-Skala pro konkreter Show (nicht pro Künstler).
+// Fließt bewusst NICHT in dataMap/rp/rl bzw. den Bewertungsdurchschnitt ein.
+function progShowStarsHTML(rid, skey) {
+  const val = showRatings[skey] || 0;
+  const keyEsc = skey.replace(/'/g, "\\'");
+  return Array.from({ length: MAX }, (_, i) => {
+    const n = i + 1, isOn = n <= val;
+    return `<span class="star star-show${isOn ? ' on' : ''}" onclick="setShowRating('${rid}','${keyEsc}',${n})">★</span>`;
+  }).join('');
+}
+function miniStarsShow(val) {
+  return Array.from({ length: MAX }, (_, i) => `<span class="show-mini-star${i < val ? ' on' : ''}">★</span>`).join('');
+}
+function setShowRating(rid, skey, n) {
+  showRatings[skey] = (showRatings[skey] === n) ? 0 : n;
+  if (!showRatings[skey]) delete showRatings[skey];
+  saveToStorage();
+  const starsEl = document.getElementById(`${rid}-show`);
+  if (starsEl) starsEl.innerHTML = progShowStarsHTML(rid, skey);
+  const val = showRatings[skey] || 0;
+  const summaryEl = document.getElementById(`${rid}-showsummary`);
+  if (summaryEl) {
+    summaryEl.style.display = val ? '' : 'none';
+    summaryEl.innerHTML = miniStarsShow(val);
+  }
+  // Falls der Auftrittsbewertungs-Filter in der Künstlerübersicht aktiv ist,
+  // muss die Liste neu gefiltert werden (Künstler kann rein-/rausfallen).
+  if (currentTab === 'kuenstler' && kuenstlerShowRatingFilter > 0) render();
+}
+
 function setProgRating(rid, name, field, val) {
   if (!dataMap[name]) return;
   const d = dataMap[name];
@@ -682,15 +744,25 @@ function toggleHidden(name) {
   toast(d.ausgeblendet ? `„${name}" ausgeblendet 🙈` : `„${name}" wieder eingeblendet 👁`);
 }
 
+// Erzeugt die Gesehen-Buttons (wiederverwendet in Künstler-Ansicht)
+function seenButtonsHTML(nj, d) {
+  return `<div class="seen-btns">
+    <button class="seen-btn${d.gesehen === 'bekannt' ? ' active-bekannt' : ''}" onclick="setSeen('${nj}','bekannt')">👂 Bekannt</button>
+    <button class="seen-btn${d.gesehen === 'ja' ? ' active-ja' : ''}" onclick="setSeen('${nj}','ja')">✓ Gesehen</button>
+  </div>`;
+}
+
+// Aktualisiert die Gesehen-Status-Anzeige überall dort, wo der Künstler
+// gerade sichtbar ist (Künstler-Detail + ggf. Programm-Übersicht).
+function refreshSeenButtons(name) {
+  renderArtistItem(name);
+  if (currentTab === 'programm') renderProg();
+}
+
 function setSeen(name, val) {
   if (!dataMap[name]) return;
   dataMap[name].gesehen = (dataMap[name].gesehen === val) ? '' : val;
-  const row = document.getElementById(`detail-${name}`);
-  if (row) {
-    const btns = row.querySelectorAll('.seen-btn');
-    btns[0].className = 'seen-btn' + (dataMap[name].gesehen === 'ja' ? ' active-ja' : '');
-    btns[1].className = 'seen-btn' + (dataMap[name].gesehen === 'bekannt' ? ' active-bekannt' : '');
-  }
+  refreshSeenButtons(name);
   updateStats();
   saveToStorage();
 }
@@ -717,12 +789,14 @@ function renderArtistItem(name) {
     <div class="badge ${gc}">${d.geschlecht}</div>
   </div>`;
   if (isExp) {
-    const jaActive = d.gesehen === 'ja' ? ' active-ja' : '';
-    const bekanntActive = d.gesehen === 'bekannt' ? ' active-bekannt' : '';
     let showsHtml = '';
     if (shows.length) {
       showsHtml = shows.sort((a,b) => dayIndex(a.day)-dayIndex(b.day)||(a.time||'zz').localeCompare(b.time||'zz'))
-        .map(s => `<div class="show-row"><div class="show-day">${s.day}</div><div class="show-time">${s.time ? s.time + (s.endTime ? '–' + s.endTime : '') : '<span style="opacity:.6">TBA</span>'}</div><div class="show-loc">${s.location || '<span style="opacity:.6">TBA</span>'}</div></div>`).join('');
+        .map((s, idx) => {
+          const skey = showKey(s);
+          const srid = `art-${nj}-${idx}`;
+          return `<div class="show-row"><div class="show-day">${s.day}</div><div class="show-time">${s.time ? s.time + (s.endTime ? '–' + s.endTime : '') : '<span style="opacity:.6">TBA</span>'}</div><div class="show-loc">${s.location || '<span style="opacity:.6">TBA</span>'}</div><div class="stars stars-sm" id="${srid}-show">${progShowStarsHTML(srid,skey)}</div></div>`;
+        }).join('');
     } else {
       showsHtml = '<div class="no-shows">Noch keine Auftrittsdaten</div>';
     }
@@ -744,10 +818,7 @@ function renderArtistItem(name) {
       </div>
       <div class="detail-section">
         <div class="detail-label">Gesehen</div>
-        <div class="seen-btns">
-          <button class="seen-btn${jaActive}" onclick="setSeen('${nj}','ja')">✓ Gesehen</button>
-          <button class="seen-btn${bekanntActive}" onclick="setSeen('${nj}','bekannt')">👂 Bekannt</button>
-        </div>
+        ${seenButtonsHTML(nj, d)}
       </div>
       <div class="detail-section">
         <div class="detail-label">Auftritte</div>
@@ -831,6 +902,32 @@ function setProgRatingFilter(n) {
   renderProgRatingStars();
   renderProg();
 }
+function renderProgShowRatingStars() {
+  const el = document.getElementById('fProgShowRatingStars');
+  if (!el) return;
+  el.innerHTML = Array.from({ length: MAX }, (_, i) => {
+    const n = i + 1;
+    return `<span class="star star-show${n <= progShowRatingFilter ? ' on' : ''}" onclick="setProgShowRatingFilter(${n})">★</span>`;
+  }).join('');
+}
+function setProgShowRatingFilter(n) {
+  progShowRatingFilter = (progShowRatingFilter === n) ? 0 : n;
+  renderProgShowRatingStars();
+  renderProg();
+}
+function renderKuenstlerShowRatingStars() {
+  const el = document.getElementById('fKuenstlerShowRatingStars');
+  if (!el) return;
+  el.innerHTML = Array.from({ length: MAX }, (_, i) => {
+    const n = i + 1;
+    return `<span class="star star-show${n <= kuenstlerShowRatingFilter ? ' on' : ''}" onclick="setKuenstlerShowRatingFilter(${n})">★</span>`;
+  }).join('');
+}
+function setKuenstlerShowRatingFilter(n) {
+  kuenstlerShowRatingFilter = (kuenstlerShowRatingFilter === n) ? 0 : n;
+  renderKuenstlerShowRatingStars();
+  render();
+}
 
 // Erkennt, ob "heute" (Gerätezeit) einer der 4 Festivaltage ist, und liefert
 // dafür den passenden Tag-Filterwert sowie eine sinnvolle Start-Uhrzeit
@@ -894,6 +991,7 @@ function renderProg() {
       if (toVal && a.time > toVal) return false;
     }
     if (minRating > 0 && avgRating(d) < minRating) return false;
+    if (progShowRatingFilter > 0 && (showRatings[showKey(a)] || 0) < progShowRatingFilter) return false;
     if (statusVal === 'ja' && d?.gesehen !== 'ja') return false;
     if (statusVal === 'bekannt' && d?.gesehen !== 'bekannt' && d?.gesehen !== 'ja') return false; // "gesehen" ist immer auch "bekannt"
     if (statusVal === 'unbekannt' && (!d || d.gesehen !== '')) return false;
@@ -909,6 +1007,8 @@ function renderProg() {
     const vals = d ? [d.rp, d.rl].filter(v => v > 0) : [];
     const avg = avgRating(d);
     const rid = `progr-${i}`;
+    const skey = showKey(a);
+    const showRating = showRatings[skey] || 0;
     const gesehenLabel = d && d.gesehen === 'ja' ? '✓ Gesehen' : d && d.gesehen === 'bekannt' ? '👂 Bekannt' : '– Unbekannt';
     const nj = a.name.replace(/'/g, "\\'");
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
@@ -921,17 +1021,26 @@ function renderProg() {
           <span>${miniStars(Math.round(avg))}</span>
           <span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>
         </div>
+        <div class="prog-showrating-summary" id="${rid}-showsummary" style="${showRating ? '' : 'display:none'}">${miniStarsShow(showRating)}</div>
       </div>
       <div class="prog-rating-arrow" id="${rid}-arrow">▸</div>
     </div>
     <div class="prog-detail collapsed" id="${rid}-detail">
-      ${d ? `<div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,nj,'rp')}</div></div>
-      <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>
-      <div class="prog-detail-row"><span class="prog-detail-label">Gesehen</span>${gesehenLabel}</div>
-      <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
-        <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" onclick="event.stopPropagation()">↗ RBF-Seite öffnen</a>
-        <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
-      </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
+      <div class="prog-detail-cols">
+        <div class="prog-detail-main">
+          ${d ? `<div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,nj,'rp')}</div></div>
+          <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>
+          <div class="prog-detail-row"><span class="prog-detail-label">Gesehen</span>${gesehenLabel}</div>
+          <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
+            <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" onclick="event.stopPropagation()">↗ RBF-Seite öffnen</a>
+            <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
+          </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
+        </div>
+        <div class="prog-detail-side">
+          <div class="prog-detail-group-label">Auftritt</div>
+          <div class="stars stars-sm prog-detail-side-stars" id="${rid}-show" onclick="event.stopPropagation()">${progShowStarsHTML(rid,skey)}</div>
+        </div>
+      </div>
     </div>`;
   });
   list.innerHTML = html;
@@ -1238,6 +1347,8 @@ updateLocFilter();
 updateTagFilters();
 buildTimeDropdowns();
 renderProgRatingStars();
+renderProgShowRatingStars();
+renderKuenstlerShowRatingStars();
 render();
 updateStats();
 </script>
