@@ -84,6 +84,7 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .star { font-size: 22px; color: var(--text3); cursor: pointer; line-height: 1; user-select: none; -webkit-user-select: none; }
 .star.on { color: var(--accent); }
 .star.on:active { color: #c0392b; }
+.stars-sm .star { font-size: 17px; }
 .seen-btns { display: flex; gap: 6px; }
 .seen-btn { flex: 1; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
 .seen-btn.active-ja { background: #0a3a1a; border-color: var(--green); color: var(--green); }
@@ -608,6 +609,31 @@ function setRating(name, field, val) {
 function miniStars(val) {
   return Array.from({ length: MAX }, (_, i) => `<span class="prog-mini-star${i < val ? ' on' : ''}">★</span>`).join('');
 }
+// Editierbare Sterne innerhalb der Programm-Detailansicht (eigener Klick-Handler,
+// da derselbe Künstler mit mehreren Auftritten gleichzeitig in der Liste stehen kann)
+function progStarsHTML(rid, name, field) {
+  const val = dataMap[name] ? dataMap[name][field] : 0;
+  return Array.from({ length: MAX }, (_, i) => {
+    const n = i + 1, isOn = n <= val;
+    return `<span class="star${isOn ? ' on' : ''}" onclick="setProgRating('${rid}','${name}','${field}',${n})">★</span>`;
+  }).join('');
+}
+function setProgRating(rid, name, field, val) {
+  if (!dataMap[name]) return;
+  const d = dataMap[name];
+  d[field] = (d[field] === val) ? 0 : val;
+  saveToStorage();
+  updateStats();
+  const starsEl = document.getElementById(`${rid}-${field}`);
+  if (starsEl) starsEl.innerHTML = progStarsHTML(rid, name, field);
+  const vals = [d.rp, d.rl].filter(v => v > 0);
+  const avg = vals.length ? vals.reduce((x,y) => x+y, 0) / vals.length : 0;
+  const summaryEl = document.getElementById(`${rid}-summary`);
+  if (summaryEl) {
+    summaryEl.style.display = vals.length ? '' : 'none';
+    summaryEl.innerHTML = `<span>${miniStars(Math.round(avg))}</span><span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>`;
+  }
+}
 let openProgRid = null;
 function toggleProgRating(rid) {
   const detail = document.getElementById(`${rid}-detail`);
@@ -835,26 +861,27 @@ function renderProg() {
     const avg = vals.length ? vals.reduce((x,y) => x+y, 0) / vals.length : 0;
     const rid = `progr-${i}`;
     const gesehenLabel = d && d.gesehen === 'ja' ? '✓ Gesehen' : d && d.gesehen === 'bekannt' ? '👂 Bekannt' : '– Noch nicht gesehen';
+    const nj = a.name.replace(/'/g, "\\'");
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
         <div class="prog-name">${a.name}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
         <div class="prog-loc">📍 ${a.location || '<span style="opacity:.6">TBA</span>'}</div>
-        ${vals.length ? `<div class="prog-rating-summary">
+        <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
           <span>${miniStars(Math.round(avg))}</span>
           <span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>
-        </div>` : ''}
+        </div>
       </div>
       <div class="prog-rating-arrow" id="${rid}-arrow">▸</div>
     </div>
     <div class="prog-detail collapsed" id="${rid}-detail">
-      ${d ? `<div class="prog-detail-row"><span class="prog-detail-label">Promo</span>${miniStars(d.rp)}</div>
-      <div class="prog-detail-row"><span class="prog-detail-label">Listening</span>${miniStars(d.rl)}</div>
+      ${d ? `<div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,nj,'rp')}</div></div>
+      <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>
       <div class="prog-detail-row"><span class="prog-detail-label">Gesehen</span>${gesehenLabel}</div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
         <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" onclick="event.stopPropagation()">↗ RBF-Seite öffnen</a>
-        <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${a.name.replace(/'/g, "\\'")}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
+        <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
       </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
     </div>`;
   });
