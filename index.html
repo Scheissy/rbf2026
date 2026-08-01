@@ -104,7 +104,9 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .day-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .day-btn { flex: 1; min-width: 60px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; }
 .day-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
-.prog-row2 { display: flex; gap: 8px; }
+.prog-row2 { display: flex; gap: 8px; align-items: center; }
+.prog-rating-filter { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); flex-shrink: 0; }
+.prog-rating-filter-label { font-size: 12px; color: var(--text3); }
 .prog-hidden-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; }
 .prog-hidden-toggle input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 .prog-row2 select { flex: 1; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 8px; color: var(--text); font-size: 13px; }
@@ -286,8 +288,9 @@ input[type=file] { display: none; }
     </select>
     <select class="filter" id="fSeen" onchange="render()">
       <option value="">Alle</option>
-      <option value="ja">Gesehen</option>
-      <option value="bekannt">Bekannt</option>
+      <option value="ja">✓ Gesehen</option>
+      <option value="bekannt">👂 Bekannt (inkl. gesehen)</option>
+      <option value="unbekannt">– Unbekannt</option>
     </select>
     <select class="filter" id="fGenre" onchange="render()">
       <option value="">Alle Genres</option>
@@ -318,6 +321,18 @@ input[type=file] { display: none; }
       <select id="timeFrom" onchange="renderProg()"></select>
       <select id="timeTo" onchange="renderProg()"></select>
       <select id="locFilter" onchange="renderProg()" style="flex:1.5"></select>
+    </div>
+    <div class="prog-row2">
+      <div class="prog-rating-filter">
+        <span class="prog-rating-filter-label">Min.:</span>
+        <div class="stars stars-sm" id="fProgRatingStars"></div>
+      </div>
+      <select id="fProgStatus" onchange="renderProg()">
+        <option value="">Alle Status</option>
+        <option value="ja">✓ Gesehen</option>
+        <option value="bekannt">👂 Bekannt (inkl. gesehen)</option>
+        <option value="unbekannt">– Unbekannt</option>
+      </select>
     </div>
     <label class="prog-hidden-toggle">
       <input type="checkbox" id="progShowHidden" checked onchange="renderProg()">
@@ -460,6 +475,7 @@ function defaultAuftritte() {
 let auftritte = defaultAuftritte();
 let expandedRows = new Set();
 let smartProgDefaultsApplied = false;
+let progRatingFilter = 0; // Mindestbewertung im Programm-Filter (0 = alle)
 let currentTab = 'kuenstler';
 let sortCol = 'name', sortDir = 1;
 
@@ -556,7 +572,9 @@ function getFiltered() {
   return Object.values(dataMap).filter(d => {
     if (q && !d.name.toLowerCase().includes(q) && !d.genre.toLowerCase().includes(q) && !d.herkunft.toLowerCase().includes(q)) return false;
     if (fg && d.geschlecht !== fg) return false;
-    if (fs && d.gesehen !== fs) return false;
+    if (fs === 'ja' && d.gesehen !== 'ja') return false;
+    if (fs === 'bekannt' && d.gesehen !== 'bekannt' && d.gesehen !== 'ja') return false; // "gesehen" ist immer auch "bekannt"
+    if (fs === 'unbekannt' && d.gesehen !== '') return false;
     if (fGenre && !splitTags(d.genre).includes(fGenre)) return false;
     if (fHerkunft && !splitTags(d.herkunft).includes(fHerkunft)) return false;
     if (fHidden === 'sichtbar' && d.ausgeblendet) return false;
@@ -763,7 +781,8 @@ function updateStats() {
      <div class="stat">Auftritte: <b>${auftritte.length}</b></div>
      <div class="stat">Bewertet: <b>${all.filter(d => d.rp > 0 || d.rl > 0).length}</b></div>
      <div class="stat">Gesehen: <b>${all.filter(d => d.gesehen === 'ja').length}</b></div>
-     <div class="stat">Bekannt: <b>${all.filter(d => d.gesehen === 'bekannt').length}</b></div>`;
+     <div class="stat">Bekannt: <b>${all.filter(d => d.gesehen === 'bekannt' || d.gesehen === 'ja').length}</b></div>
+     <div class="stat">Unbekannt: <b>${all.filter(d => d.gesehen === '').length}</b></div>`;
 }
 
 // ── PROGRAMM ──────────────────────────────────────────────────────────────────
@@ -788,6 +807,29 @@ const DAY_ORDER = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
 function dayIndex(day) {
   const i = DAY_ORDER.indexOf(day);
   return i === -1 ? 99 : i; // unbekannte/fremde Tag-Werte ans Ende
+}
+// Durchschnitt aus Promo-/Listening-Bewertung (nur gesetzte Werte zählen); 0 = unbewertet
+function avgRating(d) {
+  if (!d) return 0;
+  const vals = [d.rp, d.rl].filter(v => v > 0);
+  return vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : 0;
+}
+
+// Klickbares Sterne-Widget für den Mindestbewertungs-Filter im Programm.
+// Klick auf einen Stern setzt die Mindestbewertung; nochmaliger Klick auf
+// den bereits aktiven Stern setzt den Filter zurück (= alle anzeigen).
+function renderProgRatingStars() {
+  const el = document.getElementById('fProgRatingStars');
+  if (!el) return;
+  el.innerHTML = Array.from({ length: MAX }, (_, i) => {
+    const n = i + 1;
+    return `<span class="star${n <= progRatingFilter ? ' on' : ''}" onclick="setProgRatingFilter(${n})">★</span>`;
+  }).join('');
+}
+function setProgRatingFilter(n) {
+  progRatingFilter = (progRatingFilter === n) ? 0 : n;
+  renderProgRatingStars();
+  renderProg();
 }
 
 // Erkennt, ob "heute" (Gerätezeit) einer der 4 Festivaltage ist, und liefert
@@ -840,14 +882,21 @@ function renderProg() {
   const toVal = document.getElementById('timeTo').value;
   const locVal = document.getElementById('locFilter').value;
   const showHidden = document.getElementById('progShowHidden').checked;
+  const minRating = progRatingFilter;
+  const statusVal = document.getElementById('fProgStatus').value;
   let filtered = auftritte.filter(a => {
     if (!days.includes(a.day)) return false;
     if (locVal && a.location !== locVal) return false;
-    if (!showHidden && dataMap[a.name]?.ausgeblendet) return false;
+    const d = dataMap[a.name];
+    if (!showHidden && d?.ausgeblendet) return false;
     if (a.time) {
       if (fromVal && a.time < fromVal) return false;
       if (toVal && a.time > toVal) return false;
     }
+    if (minRating > 0 && avgRating(d) < minRating) return false;
+    if (statusVal === 'ja' && d?.gesehen !== 'ja') return false;
+    if (statusVal === 'bekannt' && d?.gesehen !== 'bekannt' && d?.gesehen !== 'ja') return false; // "gesehen" ist immer auch "bekannt"
+    if (statusVal === 'unbekannt' && (!d || d.gesehen !== '')) return false;
     return true;
   });
   filtered.sort((a,b) => dayIndex(a.day) - dayIndex(b.day) || (a.time||'zz').localeCompare(b.time||'zz') || a.name.localeCompare(b.name));
@@ -858,9 +907,9 @@ function renderProg() {
     const d = dataMap[a.name];
     const gc = d ? d.geschlecht === 'männlich' ? 'b-m' : d.geschlecht === 'weiblich' ? 'b-w' : 'b-x' : '';
     const vals = d ? [d.rp, d.rl].filter(v => v > 0) : [];
-    const avg = vals.length ? vals.reduce((x,y) => x+y, 0) / vals.length : 0;
+    const avg = avgRating(d);
     const rid = `progr-${i}`;
-    const gesehenLabel = d && d.gesehen === 'ja' ? '✓ Gesehen' : d && d.gesehen === 'bekannt' ? '👂 Bekannt' : '– Noch nicht gesehen';
+    const gesehenLabel = d && d.gesehen === 'ja' ? '✓ Gesehen' : d && d.gesehen === 'bekannt' ? '👂 Bekannt' : '– Unbekannt';
     const nj = a.name.replace(/'/g, "\\'");
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
@@ -1188,6 +1237,7 @@ loadFromStorage();
 updateLocFilter();
 updateTagFilters();
 buildTimeDropdowns();
+renderProgRatingStars();
 render();
 updateStats();
 </script>
