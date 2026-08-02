@@ -607,6 +607,15 @@ function switchTab(tab) {
   if (tab === 'io') updateManualExportDesc();
 }
 
+// Öffnet einen Link zuverlässig in einem neuen Tab/Fenster (Systembrowser).
+// In installierten PWAs (standalone) ignoriert Android target="_blank" oft und
+// navigiert stattdessen innerhalb der App weiter - window.open() umgeht das.
+function openExternal(e, url) {
+  e.preventDefault();
+  window.open(url, '_blank', 'noopener,noreferrer');
+  return false;
+}
+
 // ── TOAST ─────────────────────────────────────────────────────────────────────
 function toast(msg, ok = true) {
   const t = document.getElementById('toast');
@@ -914,7 +923,7 @@ function renderArtistItem(name) {
         <div class="detail-label">Auftritte</div>
         <div class="shows-list">${showsHtml}</div>
       </div>
-      <a class="detail-link" href="${d.customUrl || d.rbfUrl}" target="_blank">↗ RBF-Seite öffnen</a>
+      <a class="detail-link" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="return openExternal(event,'${(d.customUrl || d.rbfUrl).replace(/'/g, "\\'")}')">↗ RBF-Seite öffnen</a>
     </div>`;
   }
   container.innerHTML = html;
@@ -1143,7 +1152,7 @@ function renderProg() {
       </div>
       <div class="prog-detail-row"><span class="prog-detail-label">Gesehen</span>${gesehenLabel}</div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
-        <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" onclick="event.stopPropagation()">↗ RBF-Seite öffnen</a>
+        <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${(d.customUrl || d.rbfUrl).replace(/'/g, "\\'")}')">↗ RBF-Seite öffnen</a>
         <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
       </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
       <div class="prog-detail-divider"></div>
