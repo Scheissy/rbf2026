@@ -120,6 +120,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .show-day { color: var(--text2); width: 56px; flex-shrink: 0; }
 .show-time { color: var(--text); width: 76px; flex-shrink: 0; white-space: nowrap; font-size: 11px; }
 .show-loc { color: var(--accent); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.show-loc a, .prog-loc a { color: inherit; text-decoration: underline; text-decoration-color: rgba(232,164,0,.4); text-underline-offset: 2px; }
 .show-row .stars { flex-shrink: 0; }
 .no-shows { font-size: 12px; color: var(--text3); font-style: italic; }
 
@@ -614,6 +615,19 @@ function switchTab(tab) {
 }
 
 // Öffnet einen Link zuverlässig in einem neuen Tab/Fenster (Systembrowser).
+// Baut einen Google-Maps-Such-Link für eine Location. Auf dem Handy lässt sich
+// darüber i.d.R. die bevorzugte Navigations-App auswählen (Google Maps, Apple
+// Maps, etc.), da Android/iOS maps.google.com-Links entsprechend behandeln.
+function mapsUrl(location) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location + ', Hamburg')}`;
+}
+function openMaps(e, location) {
+  e.stopPropagation();
+  e.preventDefault();
+  window.open(mapsUrl(location), '_blank', 'noopener,noreferrer');
+  return false;
+}
+
 // In installierten PWAs (standalone) ignoriert Android target="_blank" oft und
 // navigiert stattdessen innerhalb der App weiter - window.open() umgeht das.
 function openExternal(e, url) {
@@ -903,7 +917,8 @@ function renderArtistItem(name) {
         .map((s, idx) => {
           const skey = showKey(s);
           const srid = `art-${nj}-${idx}`;
-          return `<div class="show-row"><div class="show-day">${s.day}</div><div class="show-time">${s.time ? s.time + (s.endTime ? '–' + s.endTime : '') : '<span style="opacity:.6">TBA</span>'}</div><div class="show-loc">${s.location || '<span style="opacity:.6">TBA</span>'}</div><div class="stars stars-sm" id="${srid}-show">${progShowStarsHTML(srid,skey)}</div></div>`;
+          const locHtml = s.location ? `<a href="${mapsUrl(s.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${s.location.replace(/'/g, "\\'")}')">${s.location}</a>` : '<span style="opacity:.6">TBA</span>';
+          return `<div class="show-row"><div class="show-day">${s.day}</div><div class="show-time">${s.time ? s.time + (s.endTime ? '–' + s.endTime : '') : '<span style="opacity:.6">TBA</span>'}</div><div class="show-loc">${locHtml}</div><div class="stars stars-sm" id="${srid}-show">${progShowStarsHTML(srid,skey)}</div></div>`;
         }).join('');
     } else {
       showsHtml = '<div class="no-shows">Noch keine Auftrittsdaten</div>';
@@ -1161,7 +1176,7 @@ function renderProg() {
       <div class="prog-info">
         <div class="prog-name">${a.name}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
-        <div class="prog-loc">📍 ${a.location || '<span style="opacity:.6">TBA</span>'}</div>
+        <div class="prog-loc">${a.location ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${a.location.replace(/'/g, "\\'")}')">${a.location}</a>` : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
           <span>${miniStars(Math.round(avg))}</span>
           <span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>
