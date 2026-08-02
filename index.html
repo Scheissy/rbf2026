@@ -79,6 +79,8 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .artist-detail { background: var(--surface2); padding: 12px 16px 12px 44px; border-bottom: 1px solid var(--border); }
 .detail-genre { font-size: 12px; color: var(--text2); margin-bottom: 10px; }
 .detail-section { margin-bottom: 10px; }
+.detail-ratings-row { display: flex; gap: 36px; }
+.detail-rating-col { flex-shrink: 0; }
 .detail-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
 .stars { display: flex; gap: 4px; }
 .star { font-size: 22px; color: var(--text3); cursor: pointer; line-height: 1; user-select: none; -webkit-user-select: none; }
@@ -97,10 +99,10 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .detail-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--accent); text-decoration: none; margin-top: 2px; }
 .detail-link:active { opacity: 0.7; }
 .shows-list { margin-top: 4px; }
-.show-row { display: flex; flex-wrap: nowrap; gap: 8px; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); align-items: center; }
+.show-row { display: flex; flex-wrap: nowrap; gap: 6px; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); align-items: center; }
 .show-row:last-child { border-bottom: none; }
-.show-day { color: var(--text2); width: 80px; flex-shrink: 0; }
-.show-time { color: var(--text); width: 96px; flex-shrink: 0; white-space: nowrap; }
+.show-day { color: var(--text2); width: 56px; flex-shrink: 0; }
+.show-time { color: var(--text); width: 76px; flex-shrink: 0; white-space: nowrap; font-size: 11px; }
 .show-loc { color: var(--accent); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .show-row .stars { flex-shrink: 0; }
 .no-shows { font-size: 12px; color: var(--text3); font-style: italic; }
@@ -132,11 +134,9 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .prog-detail { padding: 2px 12px 12px 66px; border-bottom: 1px solid var(--border); background: var(--surface2); }
 .prog-detail.collapsed { display: none; }
 .prog-detail-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; color: var(--text2); }
-.prog-detail-cols { display: flex; gap: 14px; align-items: flex-start; }
-.prog-detail-main { flex: 1; min-width: 0; }
-.prog-detail-side { flex-shrink: 0; border-left: 1px solid var(--border); padding-left: 14px; padding-top: 1px; }
-.prog-detail-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text3); margin-bottom: 5px; }
-.prog-detail-side-stars { flex-wrap: nowrap; white-space: nowrap; }
+.prog-detail-row-split { gap: 22px; }
+.prog-detail-pair { display: flex; align-items: center; gap: 8px; }
+.prog-detail-divider { height: 1px; background: var(--border); margin: 8px 0; }
 .prog-detail-label { width: 70px; flex-shrink: 0; color: var(--text3); }
 .prog-detail-link { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--accent); text-decoration: none; }
 .prog-star-group { font-size: 10px; color: var(--text3); display: flex; align-items: center; gap: 3px; }
@@ -808,13 +808,15 @@ function renderArtistItem(name) {
           <button onclick="openEditModal('${nj}')" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer">✏️ Bearbeiten</button>
         </div>
       </div>
-      <div class="detail-section">
-        <div class="detail-label">Rating Promo</div>
-        <div class="stars" id="sr-rp-${name}">${starsHTML(name,'rp')}</div>
-      </div>
-      <div class="detail-section">
-        <div class="detail-label">Rating Listening</div>
-        <div class="stars" id="sr-rl-${name}">${starsHTML(name,'rl')}</div>
+      <div class="detail-section detail-ratings-row">
+        <div class="detail-rating-col">
+          <div class="detail-label">Rating Promo</div>
+          <div class="stars" id="sr-rp-${name}">${starsHTML(name,'rp')}</div>
+        </div>
+        <div class="detail-rating-col">
+          <div class="detail-label">Rating Listening</div>
+          <div class="stars" id="sr-rl-${name}">${starsHTML(name,'rl')}</div>
+        </div>
       </div>
       <div class="detail-section">
         <div class="detail-label">Gesehen</div>
@@ -1026,21 +1028,17 @@ function renderProg() {
       <div class="prog-rating-arrow" id="${rid}-arrow">▸</div>
     </div>
     <div class="prog-detail collapsed" id="${rid}-detail">
-      <div class="prog-detail-cols">
-        <div class="prog-detail-main">
-          ${d ? `<div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,nj,'rp')}</div></div>
-          <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>
-          <div class="prog-detail-row"><span class="prog-detail-label">Gesehen</span>${gesehenLabel}</div>
-          <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
-            <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" onclick="event.stopPropagation()">↗ RBF-Seite öffnen</a>
-            <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
-          </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
-        </div>
-        <div class="prog-detail-side">
-          <div class="prog-detail-group-label">Auftritt</div>
-          <div class="stars stars-sm prog-detail-side-stars" id="${rid}-show" onclick="event.stopPropagation()">${progShowStarsHTML(rid,skey)}</div>
-        </div>
+      ${d ? `<div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
+        <div class="prog-detail-pair"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,nj,'rp')}</div></div>
+        <div class="prog-detail-pair"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>
       </div>
+      <div class="prog-detail-row"><span class="prog-detail-label">Gesehen</span>${gesehenLabel}</div>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
+        <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" onclick="event.stopPropagation()">↗ RBF-Seite öffnen</a>
+        <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
+      </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
+      <div class="prog-detail-divider"></div>
+      <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Auftritt</span><div class="stars stars-sm" id="${rid}-show">${progShowStarsHTML(rid,skey)}</div></div>
     </div>`;
   });
   list.innerHTML = html;
