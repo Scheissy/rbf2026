@@ -49,7 +49,8 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .search-wrap { flex: 1; min-width: 140px; position: relative; }
 .search-wrap input { width: 100%; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 10px; color: var(--text); font-size: 14px; }
 .search-wrap input::placeholder { color: var(--text3); }
-select.filter { height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 8px; color: var(--text); font-size: 13px; }
+select.filter, .filter { height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 8px; color: var(--text); font-size: 13px; font-family: inherit; }
+button.filter { cursor: pointer; white-space: nowrap; }
 
 /* STATS BAR */
 .statsbar { background: var(--bg); border-bottom: 1px solid var(--border); padding: 6px 12px; display: flex; gap: 14px; flex-shrink: 0; overflow-x: auto; }
@@ -57,6 +58,16 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .stat { font-size: 11px; color: var(--text2); white-space: nowrap; }
 .stat-clickable { cursor: pointer; }
 .stat-clickable:active { color: var(--accent); }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; background: var(--surface2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.filter-chip { display: flex; align-items: center; gap: 5px; background: var(--surface); border: 1px solid var(--accent); color: var(--accent); border-radius: 20px; padding: 3px 6px 3px 10px; font-size: 12px; }
+.filter-chip-x { cursor: pointer; width: 16px; height: 16px; border-radius: 50%; background: rgba(232,164,0,0.2); display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }
+.filter-chip-reset { display: flex; align-items: center; color: var(--text2); font-size: 12px; cursor: pointer; text-decoration: underline; padding: 3px 4px; }
+.genre-filter-btn { position: relative; }
+.genre-check-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.genre-check-row:last-child { border-bottom: none; }
+.genre-check-box { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--bg); }
+.genre-check-row.checked .genre-check-box { background: var(--accent); border-color: var(--accent); }
+.genre-check-label { font-size: 14px; color: var(--text); }
 .stat b { color: var(--text); }
 
 /* MAIN SCROLL AREA */
@@ -280,6 +291,21 @@ input[type=file] { display: none; }
   </div>
 </div>
 
+<!-- GENRE FILTER MODAL -->
+<div class="modal-backdrop" id="genreModal" onclick="handleGenreBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Genres filtern</div>
+      <button class="modal-close" onclick="closeGenreModal()">✕</button>
+    </div>
+    <div class="modal-body" id="genreModalList" style="gap:0"></div>
+    <div class="modal-footer">
+      <button class="form-btn form-btn-cancel" onclick="resetGenreFilter()">Zurücksetzen</button>
+      <button class="form-btn form-btn-save" onclick="closeGenreModal()">Fertig</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM DIALOG -->
 <div class="confirm-backdrop" id="confirmDialog">
   <div class="confirm-box">
@@ -307,9 +333,7 @@ input[type=file] { display: none; }
       <option value="bekannt">👂 Bekannt (inkl. gesehen)</option>
       <option value="unbekannt">– Unbekannt</option>
     </select>
-    <select class="filter" id="fGenre" onchange="render()">
-      <option value="">Alle Genres</option>
-    </select>
+    <button class="filter genre-filter-btn" id="fGenreBtn" onclick="openGenreModal()">🎵 Alle Genres</button>
     <select class="filter" id="fHerkunft" onchange="render()">
       <option value="">Alle Herkünfte</option>
     </select>
@@ -323,6 +347,7 @@ input[type=file] { display: none; }
       <div class="stars stars-sm" id="fKuenstlerShowRatingStars"></div>
     </div>
   </div>
+  <div class="filter-chips" id="genreChips" style="display:none"></div>
   <div class="statsbar" id="stats"></div>
   <div id="artistList"></div>
 </div>
@@ -507,6 +532,8 @@ let showRatings = {};
 let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
 let kuenstlerShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Künstlerübersicht-Filter (0 = alle)
 let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
+let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
+let allGenreTags = []; // aktuell vorkommende Genre-Tags, alphabetisch sortiert
 function showKey(a) { return `${a.name}|${a.day}|${a.time}|${a.location}`; }
 let currentTab = 'kuenstler';
 let sortCol = 'name', sortDir = 1;
@@ -599,7 +626,6 @@ function getFiltered() {
   const q = document.getElementById('search').value.toLowerCase();
   const fg = document.getElementById('fGender').value;
   const fs = document.getElementById('fSeen').value;
-  const fGenre = document.getElementById('fGenre').value;
   const fHerkunft = document.getElementById('fHerkunft').value;
   const fHidden = document.getElementById('fHidden').value;
   return Object.values(dataMap).filter(d => {
@@ -608,7 +634,7 @@ function getFiltered() {
     if (fs === 'ja' && d.gesehen !== 'ja') return false;
     if (fs === 'bekannt' && d.gesehen !== 'bekannt' && d.gesehen !== 'ja') return false; // "gesehen" ist immer auch "bekannt"
     if (fs === 'unbekannt' && d.gesehen !== '') return false;
-    if (fGenre && !splitTags(d.genre).includes(fGenre)) return false;
+    if (selectedGenres.size > 0 && !splitTags(d.genre).some(g => selectedGenres.has(g))) return false;
     if (fHerkunft && !splitTags(d.herkunft).includes(fHerkunft)) return false;
     if (fHidden === 'sichtbar' && d.ausgeblendet) return false;
     if (fHidden === 'ausgeblendet' && !d.ausgeblendet) return false;
@@ -629,14 +655,70 @@ function updateTagFilters() {
     splitTags(d.genre).forEach(g => genreSet.add(g));
     splitTags(d.herkunft).forEach(h => herkunftSet.add(h));
   });
-  const genreSel = document.getElementById('fGenre');
+  allGenreTags = [...genreSet].sort((a, b) => a.localeCompare(b, 'de'));
+  // Ausgewählte Genres, die es nicht mehr gibt (z.B. nach CSV-Änderungen), entfernen
+  [...selectedGenres].forEach(g => { if (!genreSet.has(g)) selectedGenres.delete(g); });
+  renderGenreModalList();
+  updateGenreChips();
   const herkunftSel = document.getElementById('fHerkunft');
-  const curGenre = genreSel.value, curHerkunft = herkunftSel.value;
-  genreSel.innerHTML = `<option value="">Alle Genres</option>` +
-    [...genreSet].sort((a, b) => a.localeCompare(b, 'de')).map(g => `<option value="${g}"${g === curGenre ? ' selected' : ''}>${g}</option>`).join('');
+  const curHerkunft = herkunftSel.value;
   herkunftSel.innerHTML = `<option value="">Alle Herkünfte</option>` +
     [...herkunftSet].sort((a, b) => a.localeCompare(b, 'de')).map(h => `<option value="${h}"${h === curHerkunft ? ' selected' : ''}>${h}</option>`).join('');
 }
+// ── GENRE-MEHRFACHFILTER ────────────────────────────────────────────────────
+function openGenreModal() {
+  renderGenreModalList();
+  document.getElementById('genreModal').classList.add('open');
+}
+function closeGenreModal() {
+  document.getElementById('genreModal').classList.remove('open');
+}
+function handleGenreBackdropClick(e) {
+  if (e.target.id === 'genreModal') closeGenreModal();
+}
+function renderGenreModalList() {
+  const el = document.getElementById('genreModalList');
+  if (!el) return;
+  if (!allGenreTags.length) { el.innerHTML = '<div style="color:var(--text2);font-size:13px">Keine Genres vorhanden.</div>'; return; }
+  el.innerHTML = allGenreTags.map(g => {
+    const checked = selectedGenres.has(g);
+    const gj = g.replace(/'/g, "\\'");
+    return `<div class="genre-check-row${checked ? ' checked' : ''}" onclick="toggleGenreSelection('${gj}')">
+      <div class="genre-check-box">${checked ? '✓' : ''}</div>
+      <div class="genre-check-label">${g}</div>
+    </div>`;
+  }).join('');
+}
+function toggleGenreSelection(g) {
+  if (selectedGenres.has(g)) selectedGenres.delete(g); else selectedGenres.add(g);
+  renderGenreModalList();
+  updateGenreChips();
+  render();
+}
+function removeGenreChip(g) {
+  selectedGenres.delete(g);
+  updateGenreChips();
+  renderGenreModalList();
+  render();
+}
+function resetGenreFilter() {
+  selectedGenres.clear();
+  updateGenreChips();
+  renderGenreModalList();
+  render();
+}
+function updateGenreChips() {
+  const btn = document.getElementById('fGenreBtn');
+  if (btn) btn.textContent = selectedGenres.size ? `🎵 Genre (${selectedGenres.size})` : '🎵 Alle Genres';
+  const wrap = document.getElementById('genreChips');
+  if (!wrap) return;
+  if (!selectedGenres.size) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  wrap.style.display = 'flex';
+  const chips = [...selectedGenres].sort((a, b) => a.localeCompare(b, 'de'))
+    .map(g => `<span class="filter-chip">${g}<span class="filter-chip-x" onclick="removeGenreChip('${g.replace(/'/g, "\\'")}')">✕</span></span>`).join('');
+  wrap.innerHTML = chips + (selectedGenres.size > 1 ? `<span class="filter-chip-reset" onclick="resetGenreFilter()">Alle zurücksetzen</span>` : '');
+}
+
 function getSorted(arr) {
   return [...arr].sort((a, b) => {
     let av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
@@ -870,7 +952,8 @@ function resetKuenstlerFilters() {
   document.getElementById('search').value = '';
   document.getElementById('fGender').value = '';
   document.getElementById('fSeen').value = '';
-  document.getElementById('fGenre').value = '';
+  selectedGenres.clear();
+  updateGenreChips();
   document.getElementById('fHerkunft').value = '';
   document.getElementById('fHidden').value = 'sichtbar';
   kuenstlerShowRatingFilter = 0;
