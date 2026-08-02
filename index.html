@@ -55,6 +55,8 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .statsbar { background: var(--bg); border-bottom: 1px solid var(--border); padding: 6px 12px; display: flex; gap: 14px; flex-shrink: 0; overflow-x: auto; }
 .statsbar::-webkit-scrollbar { display: none; }
 .stat { font-size: 11px; color: var(--text2); white-space: nowrap; }
+.stat-clickable { cursor: pointer; }
+.stat-clickable:active { color: var(--accent); }
 .stat b { color: var(--text); }
 
 /* MAIN SCROLL AREA */
@@ -119,6 +121,7 @@ select.filter { height: 34px; background: var(--surface); border: 1px solid var(
 .prog-hidden-toggle input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 .prog-row2 select { flex: 1; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 8px; color: var(--text); font-size: 13px; }
 .prog-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#artistList { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .prog-day-header { padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; }
 .prog-item { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
 .prog-item-hidden { opacity: .55; }
@@ -286,7 +289,7 @@ input[type=file] { display: none; }
 </div>
 
 <!-- KÜNSTLER VIEW -->
-<div id="view-kuenstler" class="view">
+<div id="view-kuenstler" class="view" style="display:flex;flex-direction:column">
   <div class="toolbar">
     <div class="search-wrap">
       <input type="text" id="search" placeholder="Suchen …" oninput="render()" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -502,6 +505,7 @@ let progRatingFilter = 0; // Mindestbewertung im Programm-Filter (0 = alle)
 let showRatings = {};
 let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
 let kuenstlerShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Künstlerübersicht-Filter (0 = alle)
+let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
 function showKey(a) { return `${a.name}|${a.day}|${a.time}|${a.location}`; }
 let currentTab = 'kuenstler';
 let sortCol = 'name', sortDir = 1;
@@ -561,7 +565,7 @@ function switchTab(tab) {
     const el = document.getElementById(`view-${t}`);
     if (t === tab) {
       el.classList.remove('hidden');
-      el.style.display = t === 'programm' ? 'flex' : '';
+      el.style.display = (t === 'programm' || t === 'kuenstler') ? 'flex' : '';
     } else {
       el.classList.add('hidden');
       el.style.display = 'none';
@@ -611,6 +615,7 @@ function getFiltered() {
       const hasMatch = auftritte.some(a => a.name === d.name && (showRatings[showKey(a)] || 0) >= kuenstlerShowRatingFilter);
       if (!hasMatch) return false;
     }
+    if (statsBewertetFilter && !(d.rp > 0 || d.rl > 0)) return false;
     return true;
   });
 }
@@ -849,13 +854,33 @@ function render() {
 function updateStats() {
   const all = Object.values(dataMap), f = getFiltered();
   document.getElementById('stats').innerHTML =
-    `<div class="stat">Gesamt: <b>${all.length}</b></div>
+    `<div class="stat stat-clickable" onclick="filterByStat('gesamt')">Gesamt: <b>${all.length}</b></div>
      <div class="stat">Angezeigt: <b>${f.length}</b></div>
      <div class="stat">Auftritte: <b>${auftritte.length}</b></div>
-     <div class="stat">Bewertet: <b>${all.filter(d => d.rp > 0 || d.rl > 0).length}</b></div>
-     <div class="stat">Gesehen: <b>${all.filter(d => d.gesehen === 'ja').length}</b></div>
-     <div class="stat">Bekannt: <b>${all.filter(d => d.gesehen === 'bekannt' || d.gesehen === 'ja').length}</b></div>
-     <div class="stat">Unbekannt: <b>${all.filter(d => d.gesehen === '').length}</b></div>`;
+     <div class="stat stat-clickable" onclick="filterByStat('bewertet')">Bewertet: <b>${all.filter(d => d.rp > 0 || d.rl > 0).length}</b></div>
+     <div class="stat stat-clickable" onclick="filterByStat('ja')">Gesehen: <b>${all.filter(d => d.gesehen === 'ja').length}</b></div>
+     <div class="stat stat-clickable" onclick="filterByStat('bekannt')">Bekannt: <b>${all.filter(d => d.gesehen === 'bekannt' || d.gesehen === 'ja').length}</b></div>
+     <div class="stat stat-clickable" onclick="filterByStat('unbekannt')">Unbekannt: <b>${all.filter(d => d.gesehen === '').length}</b></div>`;
+}
+
+// Setzt alle Künstler-Filter zurück und wendet danach optional genau ein
+// Kriterium an ("isolierte" Ansicht per Klick auf die Statistik-Zeile).
+function resetKuenstlerFilters() {
+  document.getElementById('search').value = '';
+  document.getElementById('fGender').value = '';
+  document.getElementById('fSeen').value = '';
+  document.getElementById('fGenre').value = '';
+  document.getElementById('fHerkunft').value = '';
+  document.getElementById('fHidden').value = 'sichtbar';
+  kuenstlerShowRatingFilter = 0;
+  renderKuenstlerShowRatingStars();
+  statsBewertetFilter = false;
+}
+function filterByStat(kind) {
+  resetKuenstlerFilters();
+  if (kind === 'bewertet') statsBewertetFilter = true;
+  else if (kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') document.getElementById('fSeen').value = kind;
+  render();
 }
 
 // ── PROGRAMM ──────────────────────────────────────────────────────────────────
