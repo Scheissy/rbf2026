@@ -109,6 +109,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .show-mini-star { font-size: 11px; color: var(--text3); }
 .show-mini-star.on { color: #b388ff; }
 .seen-btns { display: flex; gap: 6px; }
+.prog-detail-row .seen-btns { flex: 1; }
 .seen-btn { flex: 1; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
 .seen-btn.active-ja { background: #0a3a1a; border-color: var(--green); color: var(--green); }
 .seen-btn.active-bekannt { background: #1a2a4a; border-color: var(--blue); color: var(--blue); }
@@ -130,6 +131,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .day-btn { flex: 1; min-width: 60px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; }
 .day-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
 .prog-row2 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.prog-quick-btn { flex: 1; height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; }
+.prog-quick-btn:active { background: var(--surface2); }
 .prog-rating-filter { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); flex-shrink: 0; }
 .prog-rating-filter-label { font-size: 12px; color: var(--text3); }
 .prog-hidden-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; }
@@ -373,6 +376,10 @@ input[type=file] { display: none; }
       <button class="day-btn active" data-day="Do 17.09" onclick="toggleDay(this)">Do 17.</button>
       <button class="day-btn active" data-day="Fr 18.09" onclick="toggleDay(this)">Fr 18.</button>
       <button class="day-btn active" data-day="Sa 19.09" onclick="toggleDay(this)">Sa 19.</button>
+    </div>
+    <div class="prog-row2">
+      <button class="prog-quick-btn" onclick="resetProgFilters()">↺ Filter zurücksetzen</button>
+      <button class="prog-quick-btn" onclick="jumpToNow()">🕐 Jetzt</button>
     </div>
     <div class="prog-row2">
       <select id="timeFrom" onchange="renderProg()"></select>
@@ -901,11 +908,24 @@ function toggleHidden(name) {
 }
 
 // Erzeugt die Gesehen-Buttons (wiederverwendet in Künstler-Ansicht)
-function seenButtonsHTML(nj, d) {
-  return `<div class="seen-btns">
-    <button class="seen-btn${d.gesehen === 'bekannt' ? ' active-bekannt' : ''}" onclick="setSeen('${nj}','bekannt')">👂 Bekannt</button>
-    <button class="seen-btn${d.gesehen === 'ja' ? ' active-ja' : ''}" onclick="setSeen('${nj}','ja')">✓ Gesehen</button>
+function seenButtonsHTML(nj, d, progRid) {
+  const handler = progRid ? `setSeenProg('${progRid}','${nj}',` : `setSeen('${nj}',`;
+  return `<div class="seen-btns"${progRid ? ` id="${progRid}-seen"` : ''}>
+    <button class="seen-btn${d.gesehen === 'bekannt' ? ' active-bekannt' : ''}" onclick="${handler}'bekannt')">👂 Bekannt</button>
+    <button class="seen-btn${d.gesehen === 'ja' ? ' active-ja' : ''}" onclick="${handler}'ja')">✓ Gesehen</button>
   </div>`;
+}
+// Setzt den Gesehen-Status gezielt aus der Programm-Übersicht heraus, ohne die
+// komplette Liste neu zu rendern (sonst würde der aufgeklappte Bereich wieder
+// zuklappen). Aktualisiert nur die betroffene Zeile per direktem DOM-Update.
+function setSeenProg(rid, name, val) {
+  if (!dataMap[name]) return;
+  const d = dataMap[name];
+  d.gesehen = (d.gesehen === val) ? '' : val;
+  saveToStorage();
+  updateStats();
+  const el = document.getElementById(`${rid}-seen`);
+  if (el) el.outerHTML = seenButtonsHTML(name, d, rid);
 }
 
 // Aktualisiert die Gesehen-Status-Anzeige überall dort, wo der Künstler
@@ -1166,6 +1186,46 @@ function applySmartProgDefaults() {
   if ([...fromSel.options].some(o => o.value === ctx.time)) fromSel.value = ctx.time;
 }
 
+// Setzt alle Programm-Filter zurück (Tage, Zeit, Location, Bewertungen, Status) -
+// bewusst OHNE den "Ausgeblendete anzeigen"-Haken anzutasten, den will man i.d.R.
+// nicht bei jedem Reset wieder verlieren.
+function resetProgFilters() {
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.add('active'));
+  document.getElementById('timeFrom').value = '08:00';
+  document.getElementById('timeTo').value = '';
+  document.getElementById('locFilter').value = '';
+  document.getElementById('fProgStatus').value = '';
+  progRatingFilter = 0;
+  renderProgRatingStars();
+  progShowRatingFilter = 0;
+  renderProgShowRatingStars();
+  renderProg();
+  toast('Filter zurückgesetzt ✓');
+}
+
+// Springt auf den heutigen Festivaltag (falls es einer ist) und die aktuelle
+// Uhrzeit minus Puffer (mind. 30 Min, siehe getFestivalContext), damit gerade
+// laufende Shows nicht rausgefiltert werden.
+function jumpToNow() {
+  const ctx = getFestivalContext();
+  if (!ctx) { toast('Heute ist kein Festivaltag', false); return; }
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', b.dataset.day === ctx.day));
+  const fromSel = document.getElementById('timeFrom');
+  if ([...fromSel.options].some(o => o.value === ctx.time)) fromSel.value = ctx.time;
+  document.getElementById('timeTo').value = '';
+  // Alle weiteren Filter zurücksetzen, damit "Jetzt" wirklich die volle
+  // aktuelle Übersicht zeigt und nicht durch alte Location-/Bewertungs-/
+  // Status-Filter verzerrt wird. "Ausgeblendete anzeigen" bleibt unangetastet.
+  document.getElementById('locFilter').value = '';
+  document.getElementById('fProgStatus').value = '';
+  progRatingFilter = 0;
+  renderProgRatingStars();
+  progShowRatingFilter = 0;
+  renderProgShowRatingStars();
+  renderProg();
+  toast(`Zu ${ctx.day}, ${ctx.time} Uhr gesprungen ✓`);
+}
+
 function updateLocFilter() {
   const locs = [...new Set(auftritte.map(a => a.location).filter(Boolean))].sort();
   const sel = document.getElementById('locFilter');
@@ -1215,7 +1275,6 @@ function renderProg() {
     const rid = `progr-${i}`;
     const skey = showKey(a);
     const showRating = showRatings[skey] || 0;
-    const gesehenLabel = d && d.gesehen === 'ja' ? '✓ Gesehen' : d && d.gesehen === 'bekannt' ? '👂 Bekannt' : '– Unbekannt';
     const nj = a.name.replace(/'/g, "\\'");
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
@@ -1236,7 +1295,7 @@ function renderProg() {
         <div class="prog-detail-pair"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,nj,'rp')}</div></div>
         ${appSettings.showListening ? `<div class="prog-detail-pair"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>` : ''}
       </div>
-      <div class="prog-detail-row"><span class="prog-detail-label">Gesehen</span>${gesehenLabel}</div>
+      <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Gesehen</span>${seenButtonsHTML(nj, d, rid)}</div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
         <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${(d.customUrl || d.rbfUrl).replace(/'/g, "\\'")}')">↗ RBF-Seite öffnen</a>
         <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
