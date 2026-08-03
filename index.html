@@ -169,6 +169,12 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .io-section { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
 .io-section-title { padding: 12px 14px; font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); background: var(--surface2); }
 .io-btn { display: flex; align-items: center; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.settings-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.settings-toggle-row:last-child { border-bottom: none; }
+.settings-toggle-text { flex: 1; min-width: 0; }
+.settings-toggle-label { font-size: 14px; color: var(--text); font-weight: 600; }
+.settings-toggle-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.settings-toggle-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
 .io-btn:last-child { border-bottom: none; }
 .io-btn:active { background: var(--surface2); }
 .io-btn-icon { font-size: 22px; width: 32px; text-align: center; flex-shrink: 0; }
@@ -403,6 +409,24 @@ input[type=file] { display: none; }
 <div id="view-io" class="view hidden">
   <div class="io-view">
     <div class="io-section">
+      <div class="io-section-title">🎛️ Anzeige</div>
+      <label class="settings-toggle-row">
+        <div class="settings-toggle-text">
+          <div class="settings-toggle-label">📍 Location-Links</div>
+          <div class="settings-toggle-desc">Auftritts-Location mit Google Maps verlinken</div>
+        </div>
+        <input type="checkbox" id="settingShowMapsLinks" checked onchange="toggleSetting('showMapsLinks', this.checked)">
+      </label>
+      <label class="settings-toggle-row">
+        <div class="settings-toggle-text">
+          <div class="settings-toggle-label">🎧 Listening-Bewertung</div>
+          <div class="settings-toggle-desc">Listening-Sterne in Künstler- & Programm-Ansicht anzeigen</div>
+        </div>
+        <input type="checkbox" id="settingShowListening" checked onchange="toggleSetting('showListening', this.checked)">
+      </label>
+    </div>
+
+    <div class="io-section">
       <div class="io-section-title">📥 Importieren</div>
       <div class="io-btn" onclick="document.getElementById('csvKuenstler').click()">
         <div class="io-btn-icon">🎤</div>
@@ -506,8 +530,8 @@ input[type=file] { display: none; }
     <div>Programm</div>
   </div>
   <div class="nav-btn" id="nav-io" onclick="switchTab('io')">
-    <div class="nav-icon">↕️</div>
-    <div>Import/Export</div>
+    <div class="nav-icon">⚙️</div>
+    <div>Settings</div>
   </div>
 </div>
 
@@ -539,6 +563,8 @@ let showRatings = {};
 let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
 let kuenstlerShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Künstlerübersicht-Filter (0 = alle)
 let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
+// Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
+let appSettings = { showMapsLinks: true, showListening: true };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
 let allGenreTags = []; // aktuell vorkommende Genre-Tags, alphabetisch sortiert
 function showKey(a) { return `${a.name}|${a.day}|${a.time}|${a.location}`; }
@@ -552,7 +578,7 @@ function saveToStorage() {
       .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet)
       .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false }));
     const auftrittePayload = auftritte.length ? auftritte : [];
-    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, showRatings }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, showRatings, settings: appSettings }));
     document.getElementById('saveIndicator').textContent = '✓ gespeichert';
     setTimeout(() => document.getElementById('saveIndicator').textContent = '', 2000);
   } catch(e) { console.warn('Storage error', e); }
@@ -585,6 +611,7 @@ function loadFromStorage() {
       updateLocFilter();
     }
     if (data.showRatings) showRatings = data.showRatings;
+    if (data.settings) appSettings = { ...appSettings, ...data.settings };
   } catch(e) { console.warn('Load error', e); }
 }
 
@@ -917,7 +944,7 @@ function renderArtistItem(name) {
         .map((s, idx) => {
           const skey = showKey(s);
           const srid = `art-${nj}-${idx}`;
-          const locHtml = s.location ? `<a href="${mapsUrl(s.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${s.location.replace(/'/g, "\\'")}')">${s.location}</a>` : '<span style="opacity:.6">TBA</span>';
+          const locHtml = s.location ? (appSettings.showMapsLinks ? `<a href="${mapsUrl(s.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${s.location.replace(/'/g, "\\'")}')">${s.location}</a>` : s.location) : '<span style="opacity:.6">TBA</span>';
           return `<div class="show-row"><div class="show-day">${s.day}</div><div class="show-time">${s.time ? s.time + (s.endTime ? '–' + s.endTime : '') : '<span style="opacity:.6">TBA</span>'}</div><div class="show-loc">${locHtml}</div><div class="stars stars-sm" id="${srid}-show">${progShowStarsHTML(srid,skey)}</div></div>`;
         }).join('');
     } else {
@@ -936,10 +963,10 @@ function renderArtistItem(name) {
           <div class="detail-label">Rating Promo</div>
           <div class="stars" id="sr-rp-${name}">${starsHTML(name,'rp')}</div>
         </div>
-        <div class="detail-rating-col">
+        ${appSettings.showListening ? `<div class="detail-rating-col">
           <div class="detail-label">Rating Listening</div>
           <div class="stars" id="sr-rl-${name}">${starsHTML(name,'rl')}</div>
-        </div>
+        </div>` : ''}
       </div>
       <div class="detail-section">
         <div class="detail-label">Gesehen</div>
@@ -1030,6 +1057,18 @@ function buildTimeDropdowns() {
   document.getElementById('timeFrom').value = '10:00';
 }
 
+function toggleSetting(key, val) {
+  appSettings[key] = val;
+  saveToStorage();
+  render();
+  if (currentTab === 'programm') renderProg();
+  updateStats();
+}
+function applySettingsUI() {
+  document.getElementById('settingShowMapsLinks').checked = appSettings.showMapsLinks;
+  document.getElementById('settingShowListening').checked = appSettings.showListening;
+}
+
 function toggleDay(btn) { btn.classList.toggle('active'); renderProg(); }
 function activeDays() { return [...document.querySelectorAll('.day-btn.active')].map(b => b.dataset.day); }
 
@@ -1042,7 +1081,7 @@ function dayIndex(day) {
 // Durchschnitt aus Promo-/Listening-Bewertung (nur gesetzte Werte zählen); 0 = unbewertet
 function avgRating(d) {
   if (!d) return 0;
-  const vals = [d.rp, d.rl].filter(v => v > 0);
+  const vals = appSettings.showListening ? [d.rp, d.rl].filter(v => v > 0) : [d.rp].filter(v => v > 0);
   return vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : 0;
 }
 
@@ -1176,7 +1215,7 @@ function renderProg() {
       <div class="prog-info">
         <div class="prog-name">${a.name}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
-        <div class="prog-loc">${a.location ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${a.location.replace(/'/g, "\\'")}')">${a.location}</a>` : `📍 <span style="opacity:.6">TBA</span>`}</div>
+        <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${a.location.replace(/'/g, "\\'")}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
           <span>${miniStars(Math.round(avg))}</span>
           <span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>
@@ -1188,7 +1227,7 @@ function renderProg() {
     <div class="prog-detail collapsed" id="${rid}-detail">
       ${d ? `<div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
         <div class="prog-detail-pair"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,nj,'rp')}</div></div>
-        <div class="prog-detail-pair"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>
+        ${appSettings.showListening ? `<div class="prog-detail-pair"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>` : ''}
       </div>
       <div class="prog-detail-row"><span class="prog-detail-label">Gesehen</span>${gesehenLabel}</div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
@@ -1499,6 +1538,7 @@ function updateManualExportDesc() {
     : 'Noch keine Änderungen vorhanden';
 }
 loadFromStorage();
+applySettingsUI();
 updateLocFilter();
 updateTagFilters();
 buildTimeDropdowns();
