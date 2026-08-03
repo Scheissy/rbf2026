@@ -642,11 +642,18 @@ function switchTab(tab) {
 }
 
 // Öffnet einen Link zuverlässig in einem neuen Tab/Fenster (Systembrowser).
-// Baut einen Google-Maps-Such-Link für eine Location. Auf dem Handy lässt sich
-// darüber i.d.R. die bevorzugte Navigations-App auswählen (Google Maps, Apple
-// Maps, etc.), da Android/iOS maps.google.com-Links entsprechend behandeln.
+// Präzise Standortdaten (GPS-Koordinaten bzw. Adresse) der bekannten RBF-Venues,
+// direkt von der offiziellen RBF-Location-Datenbank übernommen. Damit landet
+// der Maps-Link exakt am richtigen Gebäude statt bei einer unsicheren Namenssuche
+// (wichtig v.a. bei mehrdeutigen Namen wie "25 Club" oder temporären Bühnen).
+const VENUE_LOCATIONS={"25 Club":{"lat":53.550119425761,"lng":9.9658569762147,"address":"Reeperbahn 25, 20359 Hamburg"},"BETTY":{"lat":53.550766,"lng":9.961066,"address":"Hamburger Berg 13, 20359 Hamburg"},"Baalsaal":{"lat":53.5500674,"lng":9.9658513,"address":"Reeperbahn 25, 20359 Hamburg"},"Bahnhof Pauli":{"lat":53.54925,"lng":9.964341,"address":"Spielbudenplatz 21-22, 20359 Hamburg"},"Docks":{"lat":53.549274,"lng":9.964525,"address":"Spielbudenplatz 19, 20359 Hamburg"},"Elbphilharmonie":{"lat":53.541439,"lng":9.984734,"address":"Platz der Deutschen Einheit 1, 20457 Hamburg"},"Indra":{"lat":53.552001203259,"lng":9.9581440435686,"address":"Große Freiheit 64, 20359 Hamburg"},"Kaiserkeller":{"lat":53.551152,"lng":9.957868,"address":"Große Freiheit 36, 20359 Hamburg"},"Mojo Club":{"lat":53.54974,"lng":9.967474,"address":"Reeperbahn 1, 20359 Hamburg"},"Mojo Jazz Café":{"lat":53.54976,"lng":9.967538,"address":"Reeperbahn 1, 20359 Hamburg"},"Nochtwache":{"lat":53.546989,"lng":9.961319,"address":"Bernhard-Nocht-Straße 69, 20359 Hamburg"},"Pooca Bar":{"lat":53.550762,"lng":9.960959,"address":"Hamburger Berg 12, 20359 Hamburg"},"Prinzenbar":{"lat":53.548774,"lng":9.964696,"address":"Kastanienallee 20, 20359 Hamburg"},"Schmidtchen":{"lat":53.5492145,"lng":9.9642575,"address":"Spielbudenplatz 21-22, 20359 Hamburg"},"Sommersalon":{"lat":53.549168,"lng":9.963364,"address":"Spielbudenplatz 21-22, 20359 Hamburg"},"Spielbude XL":{"lat":53.549722,"lng":9.966248,"address":"Spielbudenplatz, 20359 Hamburg"},"St. Pauli Fanshop":{"lat":53.54962,"lng":9.963108,"address":"Reeperbahn 63, 20359 Hamburg"},"Uebel & Gefährlich":{"lat":53.556531,"lng":9.969669,"address":"Feldstraße 66, 20359 Hamburg"},"fritz-kola Bühne":{"lat":53.55386,"lng":9.96973,"address":"Heiligengeistfeld, 20359 Hamburg"},"resonanzraum":{"lat":53.556526,"lng":9.969638,"address":"Feldstraße 66, 20359 Hamburg"},"N-Joy Reeperbus":{"address":"Spielbundeplatz 1, 20359 Hamburg"},"BETTY Bar":{"lat":53.550766,"lng":9.961066,"address":"Hamburger Berg 13, 20359 Hamburg"}};
 function mapsUrl(location) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location + ', Hamburg')}`;
+  const v = VENUE_LOCATIONS[location.trim()];
+  let query;
+  if (v && v.lat && v.lng) query = `${v.lat},${v.lng}`;
+  else if (v && v.address) query = v.address;
+  else query = location + ', Hamburg';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 function openMaps(e, location) {
   e.stopPropagation();
