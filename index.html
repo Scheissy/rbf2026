@@ -1332,20 +1332,36 @@ function setKuenstlerShowRatingFilter(n) {
   render();
 }
 
-// Erkennt, ob "heute" (Gerätezeit) einer der 4 Festivaltage ist, und liefert
-// dafür den passenden Tag-Filterwert sowie eine sinnvolle Start-Uhrzeit
-// (aktuelle Zeit minus 1h, abgerundet auf den nächsten 30-Min-Slot).
+// Erkennt, ob "heute" (in der Festival-Zeitzone Europe/Berlin, NICHT der
+// Geräte-Zeitzone) einer der 4 Festivaltage ist, und liefert dafür den
+// passenden Tag-Filterwert sowie eine sinnvolle Start-Uhrzeit (aktuelle Zeit
+// minus 1h, abgerundet auf den nächsten 30-Min-Slot). Nutzt bewusst explizit
+// Europe/Berlin statt new Date()/getHours() etc., damit das auch dann korrekt
+// bleibt, wenn das Gerät auf eine andere Zeitzone eingestellt ist (z.B. nach
+// einer Reise vergessen umzustellen).
+function getBerlinNow() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Berlin', year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false
+  }).formatToParts(new Date());
+  const get = t => parseInt(parts.find(p => p.type === t).value, 10);
+  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') === 24 ? 0 : get('hour'), minute: get('minute') };
+}
 function getFestivalContext() {
   const FESTIVAL_DAYS = { '9-16': 'Mi 16.09', '9-17': 'Do 17.09', '9-18': 'Fr 18.09', '9-19': 'Sa 19.09' };
-  const now = new Date();
+  const now = getBerlinNow();
   // Nach Mitternacht (vor 5 Uhr) zählt es gefühlt noch zum Vorabend/-tag
-  const refDate = new Date(now);
-  if (now.getHours() < 5) refDate.setDate(refDate.getDate() - 1);
-  const key = `${refDate.getMonth() + 1}-${refDate.getDate()}`;
+  let refMonth = now.month, refDay = now.day;
+  if (now.hour < 5) {
+    const prev = new Date(Date.UTC(now.year, now.month - 1, now.day - 1));
+    refMonth = prev.getUTCMonth() + 1;
+    refDay = prev.getUTCDate();
+  }
+  const key = `${refMonth}-${refDay}`;
   const day = FESTIVAL_DAYS[key];
   if (!day) return null;
 
-  let totalMin = now.getHours() * 60 + now.getMinutes() - 60; // minus 1 Stunde
+  let totalMin = now.hour * 60 + now.minute - 60; // minus 1 Stunde
   totalMin = ((totalMin % 1440) + 1440) % 1440; // sauberer Wrap über Mitternacht
   totalMin = Math.floor(totalMin / 30) * 30; // auf 30-Min-Slot abrunden
   let hh = Math.floor(totalMin / 60), mm = totalMin % 60;
