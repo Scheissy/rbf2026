@@ -255,53 +255,6 @@ input[type=file] { display: none; }
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:10px">
     <span id="saveIndicator" style="font-size:11px;color:var(--text3)"></span>
-    <button class="add-btn" onclick="openAddModal()" title="Künstler*in hinzufügen">+</button>
-  </div>
-</div>
-
-<!-- ADD ARTIST MODAL -->
-<div class="modal-backdrop" id="addModal" onclick="handleBackdropClick(event)">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Künstler*in hinzufügen</div>
-      <button class="modal-close" onclick="closeAddModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <div class="form-label">Name *</div>
-        <input class="form-input" id="formName" type="text" placeholder="z.B. Fat Dog" autocomplete="off" autocorrect="off">
-        <div class="form-error" id="formNameError">Bitte einen Namen eingeben.</div>
-      </div>
-      <div class="form-group">
-        <div class="form-label">Genre</div>
-        <input class="form-input" id="formGenre" type="text" placeholder="z.B. Indie Rock / Post-Punk" autocomplete="off">
-      </div>
-      <div class="form-group">
-        <div class="form-label">Herkunft (Land)</div>
-        <input class="form-input" id="formHerkunft" type="text" placeholder="z.B. Deutschland" autocomplete="off">
-      </div>
-      <div class="form-group">
-        <div class="form-label">Geschlecht</div>
-        <select class="form-select" id="formGeschlecht">
-          <option value="mixed">mixed</option>
-          <option value="weiblich">weiblich</option>
-          <option value="männlich">männlich</option>
-          <option value="divers">divers</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <div class="form-label">Gesehen</div>
-        <div class="form-seen-btns">
-          <button class="form-seen-btn active-none" id="fsbNone" onclick="setFormSeen('')">– Keine</button>
-          <button class="form-seen-btn" id="fsbJa" onclick="setFormSeen('ja')">✓ Gesehen</button>
-          <button class="form-seen-btn" id="fsbBekannt" onclick="setFormSeen('bekannt')">👂 Bekannt</button>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="form-btn form-btn-cancel" onclick="closeAddModal()">Abbrechen</button>
-      <button class="form-btn form-btn-save" onclick="saveNewArtist()">Hinzufügen</button>
-    </div>
   </div>
 </div>
 
@@ -446,14 +399,6 @@ input[type=file] { display: none; }
 
     <div class="io-section">
       <div class="io-section-title">📥 Importieren</div>
-      <div class="io-btn" onclick="document.getElementById('csvKuenstler').click()">
-        <div class="io-btn-icon">🎤</div>
-        <div class="io-btn-text">
-          <div class="io-btn-label">Künstler-CSV</div>
-          <div class="io-btn-desc">Ratings & Gesehen-Status laden</div>
-        </div>
-        <div class="io-btn-arrow">›</div>
-      </div>
       <div class="io-btn" onclick="document.getElementById('csvAuftritte').click()">
         <div class="io-btn-icon">📅</div>
         <div class="io-btn-text">
@@ -493,18 +438,6 @@ input[type=file] { display: none; }
     </div>
 
     <div class="io-section">
-      <div class="io-section-title">✏️ Änderungen für Code-Update</div>
-      <div class="io-btn" onclick="exportManualArtistsCSV()">
-        <div class="io-btn-icon">📋</div>
-        <div class="io-btn-text">
-          <div class="io-btn-label">Neue / geänderte Künstler</div>
-          <div class="io-btn-desc" id="manualExportDesc">Zum Einpflegen in den App-Code</div>
-        </div>
-        <div class="io-btn-arrow">⬇</div>
-      </div>
-    </div>
-
-    <div class="io-section">
       <div class="io-section-title">🔄 Zurücksetzen</div>
       <div class="io-btn" onclick="resetAuftritteToDefault()">
         <div class="io-btn-icon">📅</div>
@@ -518,14 +451,10 @@ input[type=file] { display: none; }
 
     <div class="info-box">
       <b>💾 Automatisches Speichern</b><br>
-      Alle Bewertungen werden automatisch lokal auf diesem Gerät gespeichert und bleiben auch nach dem Schließen der App erhalten.<br><br>
-      <b>🔄 Geräte synchronisieren</b><br>
-      Um Bewertungen auf ein anderes Gerät zu übertragen: Künstler-CSV exportieren, auf das andere Gerät übertragen und dort importieren.
+      Alle Bewertungen werden automatisch lokal auf diesem Gerät gespeichert und bleiben auch nach dem Schließen der App erhalten. Ein Export als Backup ist über „Künstler-CSV exportieren" jederzeit möglich.
     </div>
 
     <div class="info-box" style="margin-top:0">
-      <b>✏️ Änderungen zentral einpflegen</b><br>
-      Neue oder geänderte Künstler mit „Neue / geänderte Künstler" exportieren und die CSV an Claude schicken – dann werden die Basisdaten in den App-Code eingepflegt und per GitHub-Update für alle Geräte verfügbar.<br><br>
       <b>📋 Auftritte-CSV Format</b><br>
       Spalten: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Künstler, Tag, Zeit, Ende, Location</code> (Ende optional)<br>
       Beispiel: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Fat Dog, Fr 18.09, 22:00, 22:45, Große Freiheit 36</code><br><br>
@@ -535,7 +464,6 @@ input[type=file] { display: none; }
   </div>
 </div>
 
-<input type="file" id="csvKuenstler" accept=".csv" onchange="importKuenstlerCSV(event)">
 <input type="file" id="csvAuftritte" accept=".csv" onchange="importAuftrittCSV(event)">
 
 <div class="bottomnav">
@@ -812,7 +740,6 @@ function switchTab(tab) {
     if (!smartProgDefaultsApplied) { applySmartProgDefaults(); smartProgDefaultsApplied = true; }
     renderProg();
   }
-  if (tab === 'io') updateManualExportDesc();
 }
 
 // Öffnet einen Link zuverlässig in einem neuen Tab/Fenster (Systembrowser).
@@ -1146,10 +1073,9 @@ function renderArtistItem(name) {
     }
     html += `<div class="artist-detail" id="detail-${name}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div class="detail-genre">${d.genre}${d.manual ? ' <span style="font-size:10px;background:#2a1a4a;color:#a080e0;border-radius:4px;padding:1px 5px;margin-left:4px">manuell</span>' : ''}${d.edited ? ' <span style="font-size:10px;background:#1a2a1a;color:#80c080;border-radius:4px;padding:1px 5px;margin-left:4px">geändert</span>' : ''}</div>
+        <div class="detail-genre">${d.genre}</div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           <button onclick="toggleHidden('${nj}')" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</button>
-          <button onclick="openEditModal('${nj}')" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer">✏️ Bearbeiten</button>
         </div>
       </div>
       <div class="detail-section detail-ratings-row">
@@ -1519,59 +1445,6 @@ function parseCSV(text) {
 }
 
 // ── IMPORTS ───────────────────────────────────────────────────────────────────
-function importKuenstlerCSV(event) {
-  const file = event.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const p = parseCSV(e.target.result); if (!p) { toast('Ungültige CSV.', false); return; }
-    const h = p.header;
-    const iN = h.findIndex(x => x.includes('künstler') || x === 'name');
-    const iRp = h.findIndex(x => x.includes('promo'));
-    const iRl = h.findIndex(x => x.includes('listening'));
-    const iS = h.findIndex(x => x.includes('gesehen'));
-    const iL = h.findIndex(x => x.includes('rbf-link') || x.includes('link'));
-    const iC = h.findIndex(x => x.includes('individuell'));
-    if (iN === -1) { toast('Spalte „Künstler" nicht gefunden.', false); return; }
-
-    // check if any manually added artists would be affected
-    const manualNames = Object.values(dataMap).filter(d => d.manual).map(d => d.name);
-    const csvNames = p.rows.map(r => r[h[iN]]).filter(Boolean);
-    const affected = manualNames.filter(n => csvNames.includes(n));
-
-    const doImport = (keepManual) => {
-      let ok = 0, skip = 0;
-      p.rows.forEach(r => {
-        const name = r[h[iN]]; if (!name) return;
-        if (!dataMap[name]) { skip++; return; }
-        if (keepManual && dataMap[name].manual) { ok++; return; } // skip manual if keeping
-        const d = dataMap[name];
-        if (iRp >= 0) { const v = parseInt(r[h[iRp]]); if (v >= 1 && v <= 5) d.rp = v; else if (r[h[iRp]] === '') d.rp = 0; }
-        if (iRl >= 0) { const v = parseInt(r[h[iRl]]); if (v >= 1 && v <= 5) d.rl = v; else if (r[h[iRl]] === '') d.rl = 0; }
-        if (iS >= 0) { const v = r[h[iS]]; if (['ja','bekannt',''].includes(v)) d.gesehen = v; }
-        if (iC >= 0 && iL >= 0 && r[h[iC]] === 'ja') { const url = r[h[iL]]; if (url && url !== d.rbfUrl) d.customUrl = url; }
-        ok++;
-      });
-      saveToStorage(); render();
-      toast(`Import: ${ok} aktualisiert${skip ? `, ${skip} nicht gefunden` : ''} ✓`);
-    };
-
-    if (affected.length > 0) {
-      showConfirm(
-        'Manuell hinzugefügte Künstler*innen',
-        `${affected.length} manuell hinzugefügte(r) Künstler*in (${affected.slice(0,2).join(', ')}${affected.length > 2 ? ' …' : ''}) ist in der CSV enthalten. Was soll passieren?`,
-        [
-          { label: 'Manuell beibehalten', cls: 'confirm-btn-keep', action: () => doImport(true) },
-          { label: 'CSV-Daten übernehmen', cls: 'confirm-btn-overwrite', action: () => doImport(false) },
-          { label: 'Abbrechen', cls: 'confirm-btn-cancel', action: () => {} }
-        ]
-      );
-    } else {
-      doImport(false);
-    }
-  };
-  reader.readAsText(file, 'UTF-8'); event.target.value = '';
-}
-
 function importAuftrittCSV(event) {
   const file = event.target.files[0]; if (!file) return;
   const reader = new FileReader();
@@ -1640,168 +1513,6 @@ function exportKombiniertCSV() {
   toast('Kombinierte CSV exportiert ✓');
 }
 
-// ── ADD ARTIST MODAL ──────────────────────────────────────────────────────────
-let formSeenVal = '';
-let editingArtistName = null; // null = new, string = editing
-
-function openAddModal() {
-  editingArtistName = null;
-  document.getElementById('addModal').querySelector('.modal-title').textContent = 'Künstler*in hinzufügen';
-  document.getElementById('addModal').querySelector('.form-btn-save').textContent = 'Hinzufügen';
-  document.getElementById('formName').value = '';
-  document.getElementById('formName').disabled = false;
-  document.getElementById('formGenre').value = '';
-  document.getElementById('formHerkunft').value = '';
-  document.getElementById('formGeschlecht').value = 'mixed';
-  document.getElementById('formNameError').style.display = 'none';
-  setFormSeen('');
-  document.getElementById('addModal').classList.add('open');
-  setTimeout(() => document.getElementById('formName').focus(), 300);
-}
-
-function openEditModal(name) {
-  const d = dataMap[name];
-  if (!d) return;
-  editingArtistName = name;
-  document.getElementById('addModal').querySelector('.modal-title').textContent = 'Künstler*in bearbeiten';
-  document.getElementById('addModal').querySelector('.form-btn-save').textContent = 'Speichern';
-  document.getElementById('formName').value = d.name;
-  document.getElementById('formName').disabled = true; // name can't be changed
-  document.getElementById('formGenre').value = d.genre || '';
-  document.getElementById('formHerkunft').value = d.herkunft || '';
-  document.getElementById('formGeschlecht').value = d.geschlecht || 'mixed';
-  document.getElementById('formNameError').style.display = 'none';
-  setFormSeen(d.gesehen || '');
-  document.getElementById('addModal').classList.add('open');
-  setTimeout(() => document.getElementById('formGenre').focus(), 300);
-}
-
-function closeAddModal() {
-  document.getElementById('addModal').classList.remove('open');
-}
-
-function handleBackdropClick(e) {
-  if (e.target === document.getElementById('addModal')) closeAddModal();
-}
-
-function setFormSeen(val) {
-  formSeenVal = val;
-  document.getElementById('fsbNone').className = 'form-seen-btn' + (val === '' ? ' active-none' : '');
-  document.getElementById('fsbJa').className = 'form-seen-btn' + (val === 'ja' ? ' active-ja' : '');
-  document.getElementById('fsbBekannt').className = 'form-seen-btn' + (val === 'bekannt' ? ' active-bekannt' : '');
-}
-
-function saveNewArtist() {
-  // Edit mode
-  if (editingArtistName !== null) {
-    const d = dataMap[editingArtistName];
-    if (!d) return;
-    d.genre = document.getElementById('formGenre').value.trim();
-    d.herkunft = document.getElementById('formHerkunft').value.trim();
-    d.geschlecht = document.getElementById('formGeschlecht').value;
-    d.gesehen = formSeenVal;
-    if (!d.manual) d.edited = true; // mark as edited if not already manual
-    saveToStorage();
-    updateTagFilters();
-    render();
-    closeAddModal();
-    toast(`„${editingArtistName}" wurde aktualisiert ✓`);
-    return;
-  }
-
-  // Add mode
-  const name = document.getElementById('formName').value.trim();
-  const errEl = document.getElementById('formNameError');
-  if (!name) { errEl.style.display = 'block'; return; }
-  errEl.style.display = 'none';
-
-  if (dataMap[name]) {
-    showConfirm(
-      'Künstler*in bereits vorhanden',
-      `„${name}" ist bereits in der Liste. Sollen die bestehenden Stammdaten überschrieben werden?`,
-      [
-        { label: 'Überschreiben', cls: 'confirm-btn-keep', action: () => { doSaveArtist(name, true); closeAddModal(); } },
-        { label: 'Abbrechen', cls: 'confirm-btn-cancel', action: () => {} }
-      ]
-    );
-    return;
-  }
-  doSaveArtist(name, false);
-  closeAddModal();
-}
-
-function doSaveArtist(name, overwrite) {
-  const genre = document.getElementById('formGenre').value.trim();
-  const herkunft = document.getElementById('formHerkunft').value.trim();
-  const geschlecht = document.getElementById('formGeschlecht').value;
-
-  if (!dataMap[name] || overwrite) {
-    dataMap[name] = {
-      name, genre, herkunft, geschlecht,
-      rbfUrl: `https://www.reeperbahnfestival.com/act/${name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'ss').replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-')}`,
-      rp: dataMap[name]?.rp || 0,
-      rl: dataMap[name]?.rl || 0,
-      gesehen: overwrite ? formSeenVal : (dataMap[name]?.gesehen || formSeenVal),
-      customUrl: dataMap[name]?.customUrl || '',
-      manual: true,
-      ausgeblendet: dataMap[name]?.ausgeblendet || false
-    };
-  }
-  if (overwrite) {
-    dataMap[name].gesehen = formSeenVal;
-    dataMap[name].genre = genre;
-    dataMap[name].herkunft = herkunft;
-    dataMap[name].geschlecht = geschlecht;
-  }
-  saveToStorage();
-  updateTagFilters();
-  render();
-  toast(`„${name}" wurde hinzugefügt ✓`);
-}
-
-// ── CONFIRM DIALOG ────────────────────────────────────────────────────────────
-function showConfirm(title, text, buttons) {
-  document.getElementById('confirmTitle').textContent = title;
-  document.getElementById('confirmText').textContent = text;
-  const btns = document.getElementById('confirmBtns');
-  btns.innerHTML = '';
-  buttons.forEach(b => {
-    const btn = document.createElement('button');
-    btn.className = `confirm-btn ${b.cls}`;
-    btn.textContent = b.label;
-    btn.onclick = () => { closeConfirm(); b.action(); };
-    btns.appendChild(btn);
-  });
-  document.getElementById('confirmDialog').classList.add('open');
-}
-function closeConfirm() {
-  document.getElementById('confirmDialog').classList.remove('open');
-}
-
-function exportManualArtistsCSV() {
-  // collect manually added artists AND artists whose stammdaten were edited
-  const changed = Object.values(dataMap).filter(d => d.manual || d.edited);
-  if (!changed.length) {
-    toast('Keine neuen oder geänderten Künstler vorhanden.', false);
-    return;
-  }
-  const header = ['Aktion','Name','Genre','Herkunft','Geschlecht','RBF-URL'];
-  const rows = changed.map(d => [
-    d.manual ? 'NEU' : 'GEÄNDERT',
-    d.name, d.genre, d.herkunft, d.geschlecht,
-    d.customUrl || d.rbfUrl
-  ].map(csvQ).join(','));
-  download([header.join(','), ...rows].join('\n'), 'RBF2026_Aenderungen.csv');
-  toast(`${changed.length} Änderung(en) exportiert ✓`);
-}
-
-function updateManualExportDesc() {
-  const changed = Object.values(dataMap).filter(d => d.manual || d.edited);
-  const el = document.getElementById('manualExportDesc');
-  if (el) el.textContent = changed.length
-    ? `${changed.length} neue/geänderte Künstler*innen bereit`
-    : 'Noch keine Änderungen vorhanden';
-}
 loadFromStorage();
 autoFixAuftritte();
 applySettingsUI();
