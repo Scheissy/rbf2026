@@ -203,8 +203,6 @@ input[type=file] { display: none; }
 .no-results { padding: 40px 20px; text-align: center; color: var(--text2); font-size: 14px; }
 
 /* ADD BUTTON */
-.add-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); border: none; color: #000; font-size: 22px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0; }
-.add-btn:active { background: var(--accent2); }
 
 /* MODAL */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -215,35 +213,13 @@ input[type=file] { display: none; }
 .modal-title { font-size: 16px; font-weight: 700; }
 .modal-close { width: 32px; height: 32px; border-radius: 50%; background: var(--surface2); border: none; color: var(--text2); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .modal-body { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-.form-group { display: flex; flex-direction: column; gap: 5px; }
-.form-label { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
-.form-input { height: 42px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 12px; color: var(--text); font-size: 15px; width: 100%; }
-.form-input:focus { outline: none; border-color: var(--accent); }
-.form-select { height: 42px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 12px; color: var(--text); font-size: 15px; width: 100%; }
-.form-select:focus { outline: none; border-color: var(--accent); }
-.form-seen-btns { display: flex; gap: 8px; }
-.form-seen-btn { flex: 1; height: 40px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-.form-seen-btn.active-ja { background: #0a3a1a; border-color: var(--green); color: var(--green); }
-.form-seen-btn.active-bekannt { background: #1a2a4a; border-color: var(--blue); color: var(--blue); }
-.form-seen-btn.active-none { background: var(--surface2); border-color: var(--border); color: var(--text2); }
 .modal-footer { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; flex-shrink: 0; }
 .form-btn { flex: 1; height: 44px; border-radius: var(--radius-sm); border: none; font-size: 15px; font-weight: 700; cursor: pointer; }
 .form-btn-cancel { background: var(--surface2); color: var(--text2); }
 .form-btn-save { background: var(--accent); color: #000; }
 .form-btn-save:active { background: var(--accent2); }
-.form-error { font-size: 12px; color: #e74c3c; margin-top: 2px; display: none; }
 
 /* CONFIRM DIALOG */
-.confirm-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
-.confirm-backdrop.open { opacity: 1; pointer-events: all; }
-.confirm-box { background: var(--surface); border-radius: var(--radius); padding: 20px; max-width: 320px; width: 100%; }
-.confirm-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-.confirm-text { font-size: 14px; color: var(--text2); line-height: 1.5; margin-bottom: 16px; }
-.confirm-btns { display: flex; flex-direction: column; gap: 8px; }
-.confirm-btn { width: 100%; height: 42px; border-radius: var(--radius-sm); border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
-.confirm-btn-keep { background: var(--accent); color: #000; }
-.confirm-btn-overwrite { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-.confirm-btn-cancel { background: transparent; color: var(--text2); border: 1px solid var(--border); }
 </style>
 </head>
 <body>
@@ -270,15 +246,6 @@ input[type=file] { display: none; }
       <button class="form-btn form-btn-cancel" onclick="resetGenreFilter()">Zurücksetzen</button>
       <button class="form-btn form-btn-save" onclick="closeGenreModal()">Fertig</button>
     </div>
-  </div>
-</div>
-
-<!-- CONFIRM DIALOG -->
-<div class="confirm-backdrop" id="confirmDialog">
-  <div class="confirm-box">
-    <div class="confirm-title" id="confirmTitle"></div>
-    <div class="confirm-text" id="confirmText"></div>
-    <div class="confirm-btns" id="confirmBtns"></div>
   </div>
 </div>
 
@@ -398,18 +365,6 @@ input[type=file] { display: none; }
     </div>
 
     <div class="io-section">
-      <div class="io-section-title">📥 Importieren</div>
-      <div class="io-btn" onclick="document.getElementById('csvAuftritte').click()">
-        <div class="io-btn-icon">📅</div>
-        <div class="io-btn-text">
-          <div class="io-btn-label">Auftritte-CSV</div>
-          <div class="io-btn-desc">Zeiten & Locations laden</div>
-        </div>
-        <div class="io-btn-arrow">›</div>
-      </div>
-    </div>
-
-    <div class="io-section">
       <div class="io-section-title">📤 Exportieren</div>
       <div class="io-btn" onclick="exportKuenstlerCSV()">
         <div class="io-btn-icon">🎤</div>
@@ -455,16 +410,13 @@ input[type=file] { display: none; }
     </div>
 
     <div class="info-box" style="margin-top:0">
-      <b>📋 Auftritte-CSV Format</b><br>
-      Spalten: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Künstler, Tag, Zeit, Ende, Location</code> (Ende optional)<br>
-      Beispiel: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:12px">Fat Dog, Fr 18.09, 22:00, 22:45, Große Freiheit 36</code><br><br>
-      <b>ℹ️ Standarddaten</b><br>
-      Die App enthält bereits die offiziellen, von der RBF-Website übernommenen (Teil-)Programmdaten – Auftritte ohne bestätigte Uhrzeit/Location werden als „TBA" angezeigt. Ein eigener Import (z. B. eigene Notizen oder Testdaten) überschreibt diese Standarddaten dauerhaft auf diesem Gerät; über „Auftritte auf Standard zurücksetzen" kommst du jederzeit wieder zu den offiziellen Daten zurück.
+      <b>ℹ️ Datenquelle</b><br>
+      Alle Künstler- und Auftrittsdaten (Zeiten, Locations, Genres) stammen ausschließlich aus dem App-Code und werden zentral aktualisiert – es gibt bewusst keinen eigenen Datenimport mehr, damit immer nur ein einheitlicher Datenstand existiert. Auftritte ohne bestätigte Uhrzeit/Location werden als „TBA" angezeigt.
     </div>
   </div>
 </div>
 
-<input type="file" id="csvAuftritte" accept=".csv" onchange="importAuftrittCSV(event)">
+
 
 <div class="bottomnav">
   <div class="nav-btn active" id="nav-kuenstler" onclick="switchTab('kuenstler')">
@@ -1356,7 +1308,7 @@ function renderProg() {
   const list = document.getElementById('progList');
   openProgRid = null;
   if (!auftritte.length) {
-    list.innerHTML = `<div class="prog-empty"><div class="icon">📅</div>Noch keine Auftrittsdaten.<br>Bitte eine Auftritte-CSV importieren.</div>`;
+    list.innerHTML = `<div class="prog-empty"><div class="icon">📅</div>Noch keine Auftrittsdaten hinterlegt.</div>`;
     return;
   }
   const days = activeDays();
@@ -1424,55 +1376,6 @@ function renderProg() {
     </div>`;
   });
   list.innerHTML = html;
-}
-
-// ── CSV PARSER ────────────────────────────────────────────────────────────────
-function parseCSVLine(line) {
-  const res = []; let cur = '', inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
-    else if (c === ',' && !inQ) { res.push(cur); cur = ''; }
-    else cur += c;
-  }
-  res.push(cur); return res;
-}
-function parseCSV(text) {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim() && !l.startsWith('###'));
-  if (lines.length < 2) return null;
-  const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
-  return { header, rows: lines.slice(1).map(l => { const cols = parseCSVLine(l); const row = {}; header.forEach((h,j) => row[h] = cols[j]?.trim() || ''); return row; }) };
-}
-
-// ── IMPORTS ───────────────────────────────────────────────────────────────────
-function importAuftrittCSV(event) {
-  const file = event.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const p = parseCSV(e.target.result); if (!p) { toast('Ungültige CSV.', false); return; }
-    const h = p.header;
-    const iN = h.findIndex(x => x.includes('künstler') || x === 'name');
-    const iD = h.findIndex(x => x.includes('tag') || x.includes('datum'));
-    const iT = h.findIndex(x => (x.includes('zeit') || x.includes('uhrzeit') || x.includes('time')) && !x.includes('ende') && !x.includes('end') && !x.includes('bis'));
-    const iE = h.findIndex(x => x.includes('ende') || x.includes('end') || x.includes('bis'));
-    const iL = h.findIndex(x => x.includes('location') || x.includes('ort'));
-    if ([iN,iD,iT,iL].includes(-1)) { toast('Benötigt: Künstler, Tag, Zeit, Location', false); return; }
-    auftritte = []; let ok = 0, skip = 0;
-    p.rows.forEach(r => {
-      const name = r[h[iN]]; if (!name) return;
-      if (!dataMap[name]) skip++;
-      auftritte.push({ name, day: r[h[iD]], time: r[h[iT]], endTime: iE > -1 ? (r[h[iE]] || '') : '', location: r[h[iL]] });
-      ok++;
-    });
-    const fixes = autoFixAuftritte();
-    updateLocFilter(); saveToStorage(); render();
-    if (currentTab === 'programm') renderProg();
-    const issues = validateAuftritte(true);
-    const fixNote = fixes.length ? `, 🔧 ${fixes.length} auto-behoben` : '';
-    const issueNote = issues.length ? `, ⚠️ ${issues.length} Auffälligkeit(en) - siehe Settings` : '';
-    toast(`Auftritte: ${ok} geladen${skip ? `, ${skip} unbekannt` : ''}${fixNote}${issueNote} ✓`, !issues.length);
-  };
-  reader.readAsText(file, 'UTF-8'); event.target.value = '';
 }
 
 function resetAuftritteToDefault() {
