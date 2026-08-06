@@ -1,5 +1,5 @@
-const CACHE = 'rbf2026-v2';
-const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'rbf2026-v3';
+const ASSETS = ['./index.html', './rbf-data.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -19,9 +19,13 @@ self.addEventListener('fetch', e => {
                  req.destination === 'document' ||
                  req.url.endsWith('.html') ||
                  req.url.endsWith('/');
+  // rbf-data.js enthält die Künstler-/Auftrittsdaten und wird bei jedem
+  // Daten-Update ausgetauscht - genau wie index.html soll das SOFORT
+  // ankommen, nicht erst nach Ablauf des Cache-first-Verhaltens.
+  const isDataFile = req.url.endsWith('/rbf-data.js');
 
-  if (isHTML) {
-    // App-Shell (index.html): immer zuerst das Netz fragen, damit Updates
+  if (isHTML || isDataFile) {
+    // App-Shell + Datendatei: immer zuerst das Netz fragen, damit Updates
     // sofort ankommen. Nur offline auf den Cache zurückfallen.
     e.respondWith(
       fetch(req)
@@ -30,7 +34,7 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(req, copy));
           return res;
         })
-        .catch(() => caches.match(req).then(cached => cached || caches.match('./index.html')))
+        .catch(() => caches.match(req).then(cached => cached || (isHTML ? caches.match('./index.html') : undefined)))
     );
   } else {
     // Statische Assets (Icons, Manifest): Cache-first fürs schnelle Laden,
