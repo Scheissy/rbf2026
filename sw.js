@@ -1,8 +1,19 @@
-const CACHE = 'rbf2026-v3';
+const CACHE = 'rbf2026-v4';
 const ASSETS = ['./index.html', './rbf-data.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  // Jede Datei einzeln cachen statt addAll(): so blockiert eine einzelne
+  // (temporär) nicht erreichbare Datei nicht die komplette SW-Installation -
+  // sonst würde z.B. ein kurzzeitiges 404 direkt nach dem Deploy einer neuen
+  // Datei dazu führen, dass der Service Worker dauerhaft gar nicht erst
+  // aktiv wird.
+  e.waitUntil(
+    caches.open(CACHE).then(c =>
+      Promise.all(ASSETS.map(url =>
+        fetch(url).then(res => { if (res.ok) return c.put(url, res); }).catch(() => {})
+      ))
+    )
+  );
   self.skipWaiting();
 });
 
@@ -27,23 +38,31 @@ self.addEventListener('fetch', e => {
   if (isHTML || isDataFile) {
     // App-Shell + Datendatei: immer zuerst das Netz fragen, damit Updates
     // sofort ankommen. Nur offline auf den Cache zurückfallen.
+    // WICHTIG: nur erfolgreiche Antworten (res.ok) werden gecacht - eine
+    // Fehlerseite (404 o.ä.) darf sich nie im Cache festsetzen, sonst würde
+    // sie immer wieder ausgeliefert, auch nachdem der eigentliche Fehler
+    // längst behoben ist.
     e.respondWith(
       fetch(req)
         .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(req, copy));
+          }
           return res;
         })
         .catch(() => caches.match(req).then(cached => cached || (isHTML ? caches.match('./index.html') : undefined)))
     );
   } else {
     // Statische Assets (Icons, Manifest): Cache-first fürs schnelle Laden,
-    // im Hintergrund trotzdem aktualisieren.
+    // im Hintergrund trotzdem aktualisieren (auch hier nur bei Erfolg).
     e.respondWith(
       caches.match(req).then(cached => {
         const network = fetch(req).then(res => {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(req, copy));
+          }
           return res;
         }).catch(() => cached);
         return cached || network;
