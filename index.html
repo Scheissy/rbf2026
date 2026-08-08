@@ -490,6 +490,7 @@ let showRatings = {};
 let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
 let kuenstlerShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Künstlerübersicht-Filter (0 = alle)
 let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
+let statsUnbewertetFilter = false; // "Nur unbewertete Künstler" (kein Promo-Rating) - über Klick auf Stat-Zeile "Unbewertet"
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
 let appSettings = { showMapsLinks: true, showListening: true };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
@@ -663,6 +664,7 @@ function getFiltered() {
       if (!hasMatch) return false;
     }
     if (statsBewertetFilter && !(d.rp > 0 || d.rl > 0)) return false;
+    if (statsUnbewertetFilter && d.rp > 0) return false;
     return true;
   });
 }
@@ -1049,6 +1051,7 @@ function updateStats() {
      <div class="stat">Angezeigt: <b>${f.length}</b></div>
      <div class="stat">Auftritte: <b>${auftritte.length}</b></div>
      <div class="stat stat-clickable" onclick="filterByStat('bewertet')">Bewertet: <b>${all.filter(d => d.rp > 0 || d.rl > 0).length}</b></div>
+     <div class="stat stat-clickable" onclick="filterByStat('unbewertet')">Unbewertet: <b>${all.filter(d => !(d.rp > 0)).length}</b></div>
      <div class="stat stat-clickable" onclick="filterByStat('ja')">Gesehen: <b>${all.filter(d => d.gesehen === 'ja').length}</b></div>
      <div class="stat stat-clickable" onclick="filterByStat('bekannt')">Bekannt: <b>${all.filter(d => d.gesehen === 'bekannt' || d.gesehen === 'ja').length}</b></div>
      <div class="stat stat-clickable" onclick="filterByStat('unbekannt')">Unbekannt: <b>${all.filter(d => d.gesehen === '').length}</b></div>`;
@@ -1068,10 +1071,12 @@ function resetKuenstlerFilters() {
   kuenstlerShowRatingFilter = 0;
   renderKuenstlerShowRatingStars();
   statsBewertetFilter = false;
+  statsUnbewertetFilter = false;
 }
 function filterByStat(kind) {
   resetKuenstlerFilters();
   if (kind === 'bewertet') statsBewertetFilter = true;
+  else if (kind === 'unbewertet') statsUnbewertetFilter = true;
   else if (kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') document.getElementById('fSeen').value = kind;
   render();
 }
