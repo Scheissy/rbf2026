@@ -152,6 +152,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .prog-time-col { font-size: 13px; font-weight: 700; color: var(--accent); width: 44px; flex-shrink: 0; padding-top: 1px; }
 .prog-info { flex: 1; min-width: 0; }
 .prog-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; vertical-align: middle; flex-shrink: 0; }
+.comment-icon-btn:active { background: var(--surface2); }
 .prog-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
 .prog-loc { font-size: 11px; color: var(--accent); margin-top: 2px; }
 .prog-rating-summary { display: flex; align-items: center; gap: 5px; margin-top: 4px; }
@@ -250,6 +252,18 @@ input[type=file] { display: none; }
     <div class="modal-footer">
       <button class="form-btn form-btn-cancel" onclick="resetGenreFilter()">Zurücksetzen</button>
       <button class="form-btn form-btn-save" onclick="closeGenreModal()">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="commentModal" onclick="handleCommentBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="commentModalTitle">Kommentar</div>
+      <button class="modal-close" onclick="closeCommentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="commentModalText" style="font-size:14px;line-height:1.5;white-space:pre-wrap"></div>
     </div>
   </div>
 </div>
@@ -875,6 +889,27 @@ function onCommentInput(name) {
   commentSaveTimers[name] = setTimeout(() => saveToStorage(), 500);
 }
 
+// Nur-Lese-Ansicht des Kommentars in der Programm-Übersicht: Icon wird nur
+// gerendert, wenn ein Kommentar existiert; Klick öffnet ihn als Bottom-Sheet
+// (statt echtem Hover-Tooltip, da das auf Touch-Geräten nicht funktioniert).
+function commentIconHTML(nj, d) {
+  if (!d || !d.kommentar) return '';
+  return `<button type="button" class="comment-icon-btn" onclick="event.stopPropagation();openCommentModal('${nj}')" title="Kommentar anzeigen">💬</button>`;
+}
+function openCommentModal(name) {
+  const d = dataMap[name];
+  if (!d || !d.kommentar) return;
+  document.getElementById('commentModalTitle').textContent = name;
+  document.getElementById('commentModalText').textContent = d.kommentar;
+  document.getElementById('commentModal').classList.add('open');
+}
+function closeCommentModal() {
+  document.getElementById('commentModal').classList.remove('open');
+}
+function handleCommentBackdropClick(e) {
+  if (e.target.id === 'commentModal') closeCommentModal();
+}
+
 // Erzeugt die Gesehen-Buttons (wiederverwendet in Künstler-Ansicht)
 function seenButtonsHTML(nj, d, progRid) {
   const handler = progRid ? `setSeenProg('${progRid}','${nj}',` : `setSeen('${nj}',`;
@@ -1276,7 +1311,7 @@ function renderProg() {
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
-        <div class="prog-name">${a.name}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}</div>
+        <div class="prog-name">${a.name}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(nj, d)}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
         <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${a.location.replace(/'/g, "\\'")}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
