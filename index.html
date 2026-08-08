@@ -115,6 +115,11 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .seen-btn.active-bekannt { background: #1a2a4a; border-color: var(--blue); color: var(--blue); }
 .detail-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--accent); text-decoration: none; margin-top: 2px; }
 .detail-link:active { opacity: 0.7; }
+.comment-textarea { width: 100%; min-height: 56px; resize: vertical; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 13px; font-family: inherit; line-height: 1.4; }
+.comment-textarea::placeholder { color: var(--text3); }
+.comment-textarea:focus { outline: none; border-color: var(--accent); }
+.comment-count { font-size: 10px; color: var(--text3); text-align: right; margin-top: 3px; }
+.comment-count.comment-count-max { color: var(--accent); }
 .shows-list { margin-top: 4px; }
 .show-row { display: flex; flex-wrap: nowrap; gap: 6px; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); align-items: center; }
 .show-row:last-child { border-bottom: none; }
@@ -450,9 +455,10 @@ function safeLog(...args) {
 }
 
 const MAX = 5;
+const MAX_COMMENT_LEN = 250;
 let dataMap = {};
 RAW.forEach(r => {
-  dataMap[r[0]] = { name:r[0], genre:r[1], herkunft:r[2], geschlecht:r[3], rbfUrl:r[4], rp:0, rl:0, gesehen:'', customUrl:'', manual:false, ausgeblendet:false };
+  dataMap[r[0]] = { name:r[0], genre:r[1], herkunft:r[2], geschlecht:r[3], rbfUrl:r[4], rp:0, rl:0, gesehen:'', customUrl:'', manual:false, ausgeblendet:false, kommentar:'' };
 });
 // Von der offiziellen RBF-API übernommene (Teil-)Programmdaten: [Künstler, Tag, Zeit, Ende, Location]
 // Zeit/Location sind leer ('') = vom Festival noch nicht final bestätigt (TBA).
@@ -500,8 +506,8 @@ let sortCol = 'name', sortDir = 1;
 function saveToStorage() {
   try {
     const payload = Object.values(dataMap)
-      .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet)
-      .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false }));
+      .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet || d.kommentar)
+      .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false, c: d.kommentar||'' }));
     const auftrittePayload = auftritte.length ? auftritte : [];
     localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, auftritteVersion: DATA_VERSION, showRatings, settings: appSettings }));
     document.getElementById('saveIndicator').textContent = '✓ gespeichert';
@@ -518,7 +524,7 @@ function loadFromStorage() {
       data.ratings.forEach(r => {
         // restore manual artists that aren't in RAW
         if (!dataMap[r.n] && r.manual) {
-          dataMap[r.n] = { name:r.n, genre:r.genre||'', herkunft:r.herkunft||'', geschlecht:r.geschlecht||'mixed', rbfUrl:r.rbfUrl||'', rp:0, rl:0, gesehen:'', customUrl:'', manual:true, edited:false, ausgeblendet:false };
+          dataMap[r.n] = { name:r.n, genre:r.genre||'', herkunft:r.herkunft||'', geschlecht:r.geschlecht||'mixed', rbfUrl:r.rbfUrl||'', rp:0, rl:0, gesehen:'', customUrl:'', manual:true, edited:false, ausgeblendet:false, kommentar:'' };
         }
         if (dataMap[r.n]) {
           dataMap[r.n].rp = Math.min(r.rp || 0, MAX);
@@ -528,6 +534,7 @@ function loadFromStorage() {
           dataMap[r.n].manual = r.manual || false;
           dataMap[r.n].edited = r.edited || false;
           dataMap[r.n].ausgeblendet = r.h || false;
+          dataMap[r.n].kommentar = (r.c || '').slice(0, MAX_COMMENT_LEN);
         }
       });
     }
@@ -831,6 +838,43 @@ function toggleHidden(name) {
   toast(d.ausgeblendet ? `„${name}" ausgeblendet 🙈` : `„${name}" wieder eingeblendet 👁`);
 }
 
+// ── KOMMENTAR ─────────────────────────────────────────────────────────────────
+// Escaped Text für die Einbettung in HTML-Attribute/Textarea-Inhalt (kein
+// vorhandener Helper dafür im Rest der App, daher hier lokal definiert).
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+let commentSaveTimers = {};
+function commentHTML(nj, d) {
+  const val = d.kommentar || '';
+  const len = val.length;
+  return `<textarea class="comment-textarea" id="comment-${nj}" maxlength="${MAX_COMMENT_LEN}" placeholder="Kurze Notiz zu diesem Künstler …" oninput="onCommentInput('${nj}')">${escapeHtml(val)}</textarea>
+    <div class="comment-count${len >= MAX_COMMENT_LEN ? ' comment-count-max' : ''}" id="comment-count-${nj}">${len}/${MAX_COMMENT_LEN}</div>`;
+}
+// Aktualisiert dataMap sofort (damit der Text nicht verloren geht, falls z.B.
+// zwischendurch der Tab gewechselt wird) und schreibt debounced in localStorage,
+// damit nicht bei jedem Tastendruck geschrieben wird.
+function onCommentInput(name) {
+  if (!dataMap[name]) return;
+  const el = document.getElementById(`comment-${name}`);
+  if (!el) return;
+  const val = el.value.slice(0, MAX_COMMENT_LEN);
+  dataMap[name].kommentar = val;
+  const countEl = document.getElementById(`comment-count-${name}`);
+  if (countEl) {
+    countEl.textContent = `${val.length}/${MAX_COMMENT_LEN}`;
+    countEl.classList.toggle('comment-count-max', val.length >= MAX_COMMENT_LEN);
+  }
+  clearTimeout(commentSaveTimers[name]);
+  commentSaveTimers[name] = setTimeout(() => saveToStorage(), 500);
+}
+
 // Erzeugt die Gesehen-Buttons (wiederverwendet in Künstler-Ansicht)
 function seenButtonsHTML(nj, d, progRid) {
   const handler = progRid ? `setSeenProg('${progRid}','${nj}',` : `setSeen('${nj}',`;
@@ -921,6 +965,10 @@ function renderArtistItem(name) {
       <div class="detail-section">
         <div class="detail-label">Gesehen</div>
         ${seenButtonsHTML(nj, d)}
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">Kommentar</div>
+        ${commentHTML(nj, d)}
       </div>
       <div class="detail-section">
         <div class="detail-label">Auftritte</div>
