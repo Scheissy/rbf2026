@@ -99,6 +99,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .b-x { background: #0a3a1a; color: #70d4a0; }
 .b-d { background: #3a1a4a; color: #c080e0; }
 .b-hidden { background: #3a1a1a; color: #d47070; }
+.b-anchor { background: #123a4a; color: #6cc9e8; }
 
 /* ARTIST DETAIL PANEL */
 .artist-detail { background: var(--surface2); padding: 12px 16px 12px 44px; border-bottom: 1px solid var(--border); }
@@ -651,6 +652,17 @@ function toast(msg, ok = true) {
 function genderBadgeClass(g) {
   return g === 'männlich' ? 'b-m' : g === 'weiblich' ? 'b-w' : g === 'divers' ? 'b-d' : 'b-x';
 }
+// Prüft, ob ein Künstler für den ANCHOR Award nominiert ist. Die eigentliche
+// Nominierten-Liste (ANCHOR_NOMINEES, Array von Künstlernamen) kommt aus
+// rbf-data.js - typeof-Check, damit die App auch läuft, falls das Array dort
+// noch nicht existiert (z.B. während der Übergangsphase).
+function isAnchorNominee(name) {
+  return typeof ANCHOR_NOMINEES !== 'undefined' && Array.isArray(ANCHOR_NOMINEES) && ANCHOR_NOMINEES.includes(name);
+}
+function anchorBadgeHTML(name, small) {
+  if (!isAnchorNominee(name)) return '';
+  return `<span class="badge b-anchor"${small ? ' style="font-size:9px"' : ''} title="ANCHOR Award Nominee">⚓</span>`;
+}
 // Zerlegt Werte wie "Pop / Rock" oder "USA / UK" in einzelne, getrimmte Teile
 function splitTags(val) {
   return (val || '').split('/').map(s => s.trim()).filter(Boolean);
@@ -978,6 +990,7 @@ function renderArtistItem(name) {
   let html = `<div class="artist-row${d.ausgeblendet ? ' artist-row-hidden' : ''}" onclick="toggleExpand('${nj}')">
     <div class="artist-expand">${shows.length ? (isExp ? '▾' : '▸') : '·'}</div>
     <div class="artist-name">${d.name}</div>
+    ${anchorBadgeHTML(d.name)}
     ${d.ausgeblendet ? '<span class="badge b-hidden">🙈</span>' : ''}
     <div class="artist-country">${d.herkunft}</div>
     <div class="badge ${gc}">${d.geschlecht}</div>
@@ -1354,7 +1367,7 @@ function renderProg() {
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
-        <div class="prog-name">${a.name}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(nj, d)}</div>
+        <div class="prog-name">${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(nj, d)}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
         <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${a.location.replace(/'/g, "\\'")}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
