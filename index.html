@@ -115,7 +115,9 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .stars-sm .star { font-size: 17px; }
 .star-show.on { color: #b388ff; }
 .star-show.on:active { color: #9060e0; }
-.prog-showrating-summary { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: #b388ff; font-size: 11px; }
+.prog-showrating-summary { display: flex; align-items: center; gap: 5px; color: #b388ff; font-size: 11px; }
+.prog-duration-summary { display: flex; align-items: center; gap: 5px; color: var(--text2); font-size: 11px; }
+.prog-show-meta-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
 .show-mini-star { font-size: 11px; color: var(--text3); }
 .show-mini-star.on { color: #b388ff; }
 .seen-btns { display: flex; gap: 6px; }
@@ -152,6 +154,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .prog-rating-filter-label { font-size: 12px; color: var(--text3); }
 .prog-hidden-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; user-select: none; }
 .prog-hidden-toggle input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.prog-total-time { padding: 6px 12px; font-size: 12px; color: var(--text2); background: var(--surface); border-bottom: 1px solid var(--border); }
+.duration-select { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 12px; padding: 3px 6px; }
 .prog-row2 select { flex: 1; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 8px; color: var(--text); font-size: 13px; }
 .prog-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 #artistList { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -361,7 +365,12 @@ input[type=file] { display: none; }
       <input type="checkbox" id="progShowHidden" checked onchange="renderProg()">
       🙈 Ausgeblendete Künstler mit anzeigen
     </label>
+    <label class="prog-hidden-toggle">
+      <input type="checkbox" id="fProgDuration" onchange="renderProg()">
+      ⏱ Nur mit eingetragener Dauer
+    </label>
   </div>
+  <div class="prog-total-time" id="progTotalTime" style="display:none"></div>
   <div class="prog-list" id="progList"></div>
 </div>
 
@@ -501,6 +510,11 @@ let progRatingFilter = 0; // Mindestbewertung im Programm-Filter (0 = alle)
 // Auftritts-Bewertung: hängt an der konkreten Show (Tag+Zeit+Location), nicht am Künstler.
 // Fließt bewusst NICHT in den Künstler-Bewertungsdurchschnitt (rp/rl) ein.
 let showRatings = {};
+// Auftritts-Dauer: wie lange der Auftritt tatsächlich verfolgt wurde, in
+// 15-Minuten-Schritten von 0 bis 120 Minuten. Wie showRatings pro konkreter
+// Show (showKey) gespeichert, nicht pro Künstler. Fehlt ein Key, wurde für
+// diesen Auftritt keine Dauer eingetragen ("keine Angabe" != "0 Minuten").
+let showDurations = {};
 let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
 let kuenstlerShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Künstlerübersicht-Filter (0 = alle)
 let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
@@ -538,7 +552,7 @@ function saveToStorage() {
       .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet || d.kommentar)
       .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false, c: d.kommentar||'' }));
     const auftrittePayload = auftritte.length ? auftritte : [];
-    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, auftritteVersion: DATA_VERSION, showRatings, settings: appSettings }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, auftritteVersion: DATA_VERSION, showRatings, showDurations, settings: appSettings }));
     document.getElementById('saveIndicator').textContent = '✓ gespeichert';
     setTimeout(() => document.getElementById('saveIndicator').textContent = '', 2000);
   } catch(e) { safeLog('Storage error', e); }
@@ -579,6 +593,7 @@ function loadFromStorage() {
       }
     }
     if (data.showRatings) showRatings = data.showRatings;
+    if (data.showDurations) showDurations = data.showDurations;
     if (data.settings) appSettings = { ...appSettings, ...data.settings };
   } catch(e) { safeLog('Load error', e); }
 }
@@ -816,6 +831,18 @@ function progShowStarsHTML(rid, skey) {
 function miniStarsShow(val) {
   return Array.from({ length: MAX }, (_, i) => `<span class="show-mini-star${i < val ? ' on' : ''}">★</span>`).join('');
 }
+// Blendet die gemeinsame Zeile aus Auftritts-Bewertung + Dauer in der
+// eingeklappten Programm-Zeile ein/aus, je nachdem ob mindestens eine der
+// beiden Angaben aktuell gesetzt ist. Wird von setShowRating() UND
+// setShowDuration() aufgerufen, da beide Werte in derselben Zeile stehen.
+function updateShowMetaRowVisibility(rid) {
+  const row = document.getElementById(`${rid}-showmetarow`);
+  if (!row) return;
+  const ss = document.getElementById(`${rid}-showsummary`);
+  const ds = document.getElementById(`${rid}-durationsummary`);
+  const visible = (ss && ss.style.display !== 'none') || (ds && ds.style.display !== 'none');
+  row.style.display = visible ? '' : 'none';
+}
 function setShowRating(rid, skey, n) {
   showRatings[skey] = (showRatings[skey] === n) ? 0 : n;
   if (!showRatings[skey]) delete showRatings[skey];
@@ -828,9 +855,89 @@ function setShowRating(rid, skey, n) {
     summaryEl.style.display = val ? '' : 'none';
     summaryEl.innerHTML = miniStarsShow(val);
   }
+  updateShowMetaRowVisibility(rid);
   // Falls der Auftrittsbewertungs-Filter in der Künstlerübersicht aktiv ist,
   // muss die Liste neu gefiltert werden (Künstler kann rein-/rausfallen).
   if (currentTab === 'kuenstler' && kuenstlerShowRatingFilter > 0) render();
+}
+
+// ── AUFTRITTS-DAUER ─────────────────────────────────────────────────────────
+// Formatiert Minuten als "45 Min" / "1h" / "1h 15min" für Anzeige & Dropdown.
+function formatDuration(min) {
+  if (min === 0) return '0 Min';
+  const h = Math.floor(min / 60), m = min % 60;
+  if (h === 0) return `${m} Min`;
+  return m === 0 ? `${h}h` : `${h}h ${m}min`;
+}
+// Dropdown 0-120 Min in 15-Minuten-Schritten. 0 = "keine Dauer eingetragen"
+// (wie bei showRatings: 0/kein Eintrag wird beim Speichern aus dem Objekt
+// gelöscht statt als 0 gespeichert - kein separater "keine Angabe"-Zustand).
+function durationSelectHTML(rid, skeyEsc, skey) {
+  const cur = showDurations[skey] || 0;
+  const opts = Array.from({ length: 9 }, (_, i) => i * 15).map(m =>
+    `<option value="${m}"${cur === m ? ' selected' : ''}>${formatDuration(m)}</option>`).join('');
+  return `<select class="duration-select" onchange="setShowDuration('${rid}','${skeyEsc}',this.value)">${opts}</select>`;
+}
+function setShowDuration(rid, skey, valStr) {
+  const val = parseInt(valStr, 10);
+  if (val > 0) showDurations[skey] = val;
+  else delete showDurations[skey];
+  saveToStorage();
+  const summaryEl = document.getElementById(`${rid}-durationsummary`);
+  if (summaryEl) {
+    summaryEl.style.display = val > 0 ? '' : 'none';
+    summaryEl.textContent = val > 0 ? `⏱ ${formatDuration(val)}` : '';
+  }
+  updateShowMetaRowVisibility(rid);
+  // Wird gerade die Dauer entfernt (auf 0 gesetzt) UND der "Nur mit Dauer"-
+  // Filter ist aktiv, muss die Zeile aus der Liste verschwinden -> volle
+  // Neu-Filterung nötig.
+  if (document.getElementById('fProgDuration').checked && val === 0) { renderProg(); return; }
+  updateProgTotalTime();
+}
+// Zentrale Filterlogik der Programm-Übersicht - von renderProg() UND
+// updateProgTotalTime() genutzt, damit beide immer exakt dieselben Auftritte
+// als "aktuell sichtbar" behandeln.
+function getFilteredAuftritte() {
+  const days = activeDays();
+  const fromVal = document.getElementById('timeFrom').value;
+  const toVal = document.getElementById('timeTo').value;
+  const locVal = document.getElementById('locFilter').value;
+  const showHidden = document.getElementById('progShowHidden').checked;
+  const minRating = progRatingFilter;
+  const statusVal = document.getElementById('fProgStatus').value;
+  const durationOnly = document.getElementById('fProgDuration').checked;
+  return auftritte.filter(a => {
+    if (!days.includes(a.day)) return false;
+    if (locVal && a.location !== locVal) return false;
+    const d = dataMap[a.name];
+    if (!showHidden && d?.ausgeblendet) return false;
+    if (a.time) {
+      if (fromVal && timeSortValue(a.time) < timeSortValue(fromVal)) return false;
+      if (toVal && timeSortValue(a.time) > timeSortValue(toVal)) return false;
+    }
+    if (minRating > 0 && avgRating(d) < minRating) return false;
+    if (progShowRatingFilter > 0 && (showRatings[showKey(a)] || 0) < progShowRatingFilter) return false;
+    if (statusVal === 'ja' && d?.gesehen !== 'ja') return false;
+    if (statusVal === 'bekannt' && d?.gesehen !== 'bekannt' && d?.gesehen !== 'ja') return false; // "gesehen" ist immer auch "bekannt"
+    if (statusVal === 'unbekannt' && (!d || d.gesehen !== '')) return false;
+    if (durationOnly && showDurations[showKey(a)] === undefined) return false;
+    return true;
+  });
+}
+// Summiert die eingetragenen Dauern über die aktuell gefilterte Auftritts-
+// liste (identische Filter wie renderProg()) und zeigt das Ergebnis über der
+// Liste an. Blendet sich komplett aus, wenn in der aktuellen Ansicht keine
+// einzige Dauer eingetragen ist.
+function updateProgTotalTime() {
+  const el = document.getElementById('progTotalTime');
+  if (!el) return;
+  if (!auftritte.length) { el.style.display = 'none'; return; }
+  const withDuration = getFilteredAuftritte().filter(a => showDurations[showKey(a)] !== undefined);
+  if (!withDuration.length) { el.style.display = 'none'; el.textContent = ''; return; }
+  const totalMin = withDuration.reduce((sum, a) => sum + showDurations[showKey(a)], 0);
+  el.style.display = '';
+  el.textContent = `⏱ Gesamtzeit: ${formatDuration(totalMin)} (${withDuration.length} Auftritt${withDuration.length === 1 ? '' : 'e'} mit Dauer)`;
 }
 
 function setProgRating(rid, name, field, val) {
@@ -1283,6 +1390,7 @@ function resetProgFilters() {
   document.getElementById('timeTo').value = '';
   document.getElementById('locFilter').value = '';
   document.getElementById('fProgStatus').value = '';
+  document.getElementById('fProgDuration').checked = false;
   progRatingFilter = 0;
   renderProgRatingStars();
   progShowRatingFilter = 0;
@@ -1306,6 +1414,7 @@ function jumpToNow() {
   // Status-Filter verzerrt wird. "Ausgeblendete anzeigen" bleibt unangetastet.
   document.getElementById('locFilter').value = '';
   document.getElementById('fProgStatus').value = '';
+  document.getElementById('fProgDuration').checked = false;
   progRatingFilter = 0;
   renderProgRatingStars();
   progShowRatingFilter = 0;
@@ -1326,32 +1435,12 @@ function renderProg() {
   openProgRid = null;
   if (!auftritte.length) {
     list.innerHTML = `<div class="prog-empty"><div class="icon">📅</div>Noch keine Auftrittsdaten hinterlegt.</div>`;
+    updateProgTotalTime();
     return;
   }
-  const days = activeDays();
-  const fromVal = document.getElementById('timeFrom').value;
-  const toVal = document.getElementById('timeTo').value;
-  const locVal = document.getElementById('locFilter').value;
-  const showHidden = document.getElementById('progShowHidden').checked;
-  const minRating = progRatingFilter;
-  const statusVal = document.getElementById('fProgStatus').value;
-  let filtered = auftritte.filter(a => {
-    if (!days.includes(a.day)) return false;
-    if (locVal && a.location !== locVal) return false;
-    const d = dataMap[a.name];
-    if (!showHidden && d?.ausgeblendet) return false;
-    if (a.time) {
-      if (fromVal && timeSortValue(a.time) < timeSortValue(fromVal)) return false;
-      if (toVal && timeSortValue(a.time) > timeSortValue(toVal)) return false;
-    }
-    if (minRating > 0 && avgRating(d) < minRating) return false;
-    if (progShowRatingFilter > 0 && (showRatings[showKey(a)] || 0) < progShowRatingFilter) return false;
-    if (statusVal === 'ja' && d?.gesehen !== 'ja') return false;
-    if (statusVal === 'bekannt' && d?.gesehen !== 'bekannt' && d?.gesehen !== 'ja') return false; // "gesehen" ist immer auch "bekannt"
-    if (statusVal === 'unbekannt' && (!d || d.gesehen !== '')) return false;
-    return true;
-  });
+  let filtered = getFilteredAuftritte();
   filtered.sort((a,b) => dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.time) - timeSortValue(b.time) || a.name.localeCompare(b.name));
+  updateProgTotalTime();
   if (!filtered.length) { list.innerHTML = `<div class="prog-empty">Keine Auftritte für diese Filter.</div>`; return; }
   let html = '', lastDay = '';
   filtered.forEach((a, i) => {
@@ -1363,7 +1452,9 @@ function renderProg() {
     const rid = `progr-${i}`;
     const skey = showKey(a);
     const showRating = showRatings[skey] || 0;
+    const duration = showDurations[skey];
     const nj = a.name.replace(/'/g, "\\'");
+    const skeyEsc = skey.replace(/'/g, "\\'");
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
@@ -1374,7 +1465,10 @@ function renderProg() {
           <span>${miniStars(Math.round(avg))}</span>
           <span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>
         </div>
-        <div class="prog-showrating-summary" id="${rid}-showsummary" style="${showRating ? '' : 'display:none'}">${miniStarsShow(showRating)}</div>
+        <div class="prog-show-meta-row" id="${rid}-showmetarow" style="${(showRating || duration !== undefined) ? '' : 'display:none'}">
+          <div class="prog-showrating-summary" id="${rid}-showsummary" style="${showRating ? '' : 'display:none'}">${miniStarsShow(showRating)}</div>
+          <div class="prog-duration-summary" id="${rid}-durationsummary" style="${duration !== undefined ? '' : 'display:none'}">${duration !== undefined ? `⏱ ${formatDuration(duration)}` : ''}</div>
+        </div>
       </div>
       <div class="prog-rating-arrow" id="${rid}-arrow">▸</div>
     </div>
@@ -1389,7 +1483,10 @@ function renderProg() {
         <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
       </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
       <div class="prog-detail-divider"></div>
-      <div class="prog-detail-row" onclick="event.stopPropagation()"><div class="prog-detail-pair"><span class="prog-detail-label">Auftritt</span><div class="stars stars-sm" id="${rid}-show">${progShowStarsHTML(rid,skey)}</div></div></div>
+      <div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
+        <div class="prog-detail-pair"><span class="prog-detail-label">Auftritt</span><div class="stars stars-sm" id="${rid}-show">${progShowStarsHTML(rid,skey)}</div></div>
+        <div class="prog-detail-pair"><span class="prog-detail-label">Dauer</span>${durationSelectHTML(rid, skeyEsc, skey)}</div>
+      </div>
     </div>`;
   });
   list.innerHTML = html;
