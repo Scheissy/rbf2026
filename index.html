@@ -661,7 +661,7 @@ function isAnchorNominee(name) {
 }
 function anchorBadgeHTML(name, small) {
   if (!isAnchorNominee(name)) return '';
-  return `<span class="badge b-anchor"${small ? ' style="font-size:9px"' : ''} title="Anchor Award Nominierung">⚓</span>`;
+  return ` <span class="badge b-anchor"${small ? ' style="font-size:9px"' : ''} title="Anchor Award Nominierung">⚓</span>`;
 }
 // Zerlegt Werte wie "Pop / Rock" oder "USA / UK" in einzelne, getrimmte Teile
 function splitTags(val) {
