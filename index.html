@@ -652,16 +652,16 @@ function toast(msg, ok = true) {
 function genderBadgeClass(g) {
   return g === 'männlich' ? 'b-m' : g === 'weiblich' ? 'b-w' : g === 'divers' ? 'b-d' : 'b-x';
 }
-// Prüft, ob ein Künstler für den ANCHOR Award nominiert ist. Die eigentliche
-// Nominierten-Liste (ANCHOR_NOMINEES, Array von Künstlernamen) kommt aus
-// rbf-data.js - typeof-Check, damit die App auch läuft, falls das Array dort
-// noch nicht existiert (z.B. während der Übergangsphase).
+// Prüft, ob ein Künstler für den Anchor Award nominiert ist. Die eigentliche
+// Nominierten-Liste (ANCHOR_AWARD_NOMINEES, Array von Künstlernamen, exakt
+// wie RAW[i][0]) kommt aus rbf-data.js - typeof-Check, damit die App auch
+// läuft, falls das Array dort mal (noch) nicht existiert.
 function isAnchorNominee(name) {
-  return typeof ANCHOR_NOMINEES !== 'undefined' && Array.isArray(ANCHOR_NOMINEES) && ANCHOR_NOMINEES.includes(name);
+  return typeof ANCHOR_AWARD_NOMINEES !== 'undefined' && Array.isArray(ANCHOR_AWARD_NOMINEES) && ANCHOR_AWARD_NOMINEES.includes(name);
 }
 function anchorBadgeHTML(name, small) {
   if (!isAnchorNominee(name)) return '';
-  return `<span class="badge b-anchor"${small ? ' style="font-size:9px"' : ''} title="ANCHOR Award Nominee">⚓</span>`;
+  return `<span class="badge b-anchor"${small ? ' style="font-size:9px"' : ''} title="Anchor Award Nominierung">⚓</span>`;
 }
 // Zerlegt Werte wie "Pop / Rock" oder "USA / UK" in einzelne, getrimmte Teile
 function splitTags(val) {
