@@ -838,6 +838,12 @@ function miniStarsShow(val) {
 function updateShowMetaRowVisibility(rid) {
   const row = document.getElementById(`${rid}-showmetarow`);
   if (!row) return;
+  // Ist die Detailansicht gerade aufgeklappt, bleibt die Kopfzeilen-Anzeige
+  // ausgeblendet - Bewertung & Dauer sind dort ja schon (editierbar) zu sehen,
+  // eine zusätzliche Anzeige wäre nur doppelter, unnötiger Platzverbrauch
+  // (gerade auf dem Handy relevant).
+  const detail = document.getElementById(`${rid}-detail`);
+  if (detail && !detail.classList.contains('collapsed')) { row.style.display = 'none'; return; }
   const ss = document.getElementById(`${rid}-showsummary`);
   const ds = document.getElementById(`${rid}-durationsummary`);
   const visible = (ss && ss.style.display !== 'none') || (ds && ds.style.display !== 'none');
@@ -968,11 +974,13 @@ function toggleProgRating(rid) {
     const prevArrow = document.getElementById(`${openProgRid}-arrow`);
     if (prevDetail) prevDetail.classList.add('collapsed');
     if (prevArrow) prevArrow.textContent = '▸';
+    updateShowMetaRowVisibility(openProgRid);
   }
 
   const nowCollapsed = detail.classList.toggle('collapsed');
   if (arrow) arrow.textContent = nowCollapsed ? '▸' : '▾';
   openProgRid = nowCollapsed ? null : rid;
+  updateShowMetaRowVisibility(rid);
 }
 
 // ── SEEN ──────────────────────────────────────────────────────────────────────
