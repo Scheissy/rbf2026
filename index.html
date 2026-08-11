@@ -107,6 +107,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .detail-section { margin-bottom: 10px; }
 .detail-ratings-row { display: flex; gap: 36px; }
 .detail-rating-col { flex-shrink: 0; }
+.detail-avg-val { font-size: 10px; color: var(--text2); margin-top: 2px; }
 .detail-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
 .stars { display: flex; gap: 4px; }
 .star { font-size: 22px; color: var(--text3); cursor: pointer; line-height: 1; user-select: none; -webkit-user-select: none; }
@@ -803,6 +804,8 @@ function setRating(name, field, val) {
   dataMap[name][field] = (dataMap[name][field] === val) ? 0 : val;
   const el = document.getElementById(`sr-${field}-${name}`);
   if (el) el.innerHTML = starsHTML(name, field);
+  const avgColEl = document.getElementById(`avg-col-${name}`);
+  if (avgColEl) avgColEl.outerHTML = avgColHTML(name, dataMap[name]);
   updateStats();
   saveToStorage();
 }
@@ -1148,6 +1151,7 @@ function renderArtistItem(name) {
           <div class="detail-label">Rating Listening</div>
           <div class="stars" id="sr-rl-${name}">${starsHTML(name,'rl')}</div>
         </div>` : ''}
+        ${avgColHTML(name, d)}
       </div>
       <div class="detail-section">
         <div class="detail-label">Gesehen</div>
@@ -1306,6 +1310,26 @@ function avgRating(d) {
   if (!d) return 0;
   const vals = appSettings.showListening ? [d.rp, d.rl].filter(v => v > 0) : [d.rp].filter(v => v > 0);
   return vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : 0;
+}
+
+// Dritte Spalte in der Künstler-Detailansicht neben Promo-/Listening-Rating:
+// nur-lesende Durchschnittsanzeige. Erscheint nur, wenn "Rating Listening" in
+// den Settings aktiv ist UND tatsächlich mehr als eine Bewertung (Promo UND
+// Listening) vorgenommen wurde - ein einzelner Wert hat schließlich keinen
+// "Durchschnitt". Eigene Funktion, damit setRating() sie bei jeder Bewertungs-
+// änderung live per outerHTML-Ersatz aktualisieren kann (analog zu den
+// Auftritts-Zusammenfassungen in der Programm-Übersicht).
+function avgColHTML(name, d) {
+  const ratedCount = [d.rp, d.rl].filter(v => v > 0).length;
+  if (!appSettings.showListening || ratedCount <= 1) {
+    return `<div class="detail-rating-col" id="avg-col-${name}" style="display:none"></div>`;
+  }
+  const avg = avgRating(d);
+  return `<div class="detail-rating-col" id="avg-col-${name}">
+    <div class="detail-label">⌀ Durchschnitt</div>
+    <div>${miniStars(Math.round(avg))}</div>
+    <div class="detail-avg-val">⌀ ${avg.toFixed(1)}</div>
+  </div>`;
 }
 
 // Klickbares Sterne-Widget für den Mindestbewertungs-Filter im Programm.
