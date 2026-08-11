@@ -65,7 +65,9 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .statsbar-fade-right { right: 0; background: linear-gradient(to left, var(--bg) 40%, transparent); justify-content: flex-end; }
 .statsbar-fade-arrow { font-size: 13px; color: var(--text3); }
 .stat { font-size: 11px; color: var(--text2); white-space: nowrap; }
+.stat b { color: var(--text); }
 .stat-active { color: var(--bg); background: var(--accent); padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+.stat-active b { color: var(--bg); } /* muss NACH .stat b stehen: gleiche Spezifität, sonst gewinnt .stat b */
 .stat-clickable { cursor: pointer; }
 .stat-clickable:active { color: var(--accent); }
 .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; background: var(--surface2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -78,8 +80,6 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .genre-check-box { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--bg); }
 .genre-check-row.checked .genre-check-box { background: var(--accent); border-color: var(--accent); }
 .genre-check-label { font-size: 14px; color: var(--text); }
-.stat b { color: var(--text); }
-.stat-active b { color: var(--bg); } /* muss NACH .stat b stehen: gleiche Spezifität, sonst gewinnt .stat b */
 
 /* MAIN SCROLL AREA */
 .view { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
@@ -490,6 +490,14 @@ const LS_KEY = 'rbf2026_v1';
 function safeLog(...args) {
   try { (console.log || (() => {}))(...args); } catch (e) {}
 }
+// Escaped einen String für die sichere Einbettung in einfach gequotete
+// JS-String-Literale innerhalb von onclick-Attributen, z.B.
+// onclick="foo('${escJs(name)}')" - überall dort nötig, wo Künstlernamen,
+// Locations oder URLs (die selbst Apostrophe enthalten können, z.B. "Dov'è
+// Liana") in generiertes HTML eingebettet werden.
+function escJs(str) {
+  return String(str).replace(/'/g, "\\'");
+}
 
 const MAX = 5;
 const MAX_COMMENT_LEN = 250;
@@ -524,23 +532,10 @@ let appSettings = { showMapsLinks: true, showListening: true };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
 let allGenreTags = []; // aktuell vorkommende Genre-Tags, alphabetisch sortiert
 
-
 function showKey(a) {
   if (a.nid !== undefined && a.nid !== null) return `nid:${a.nid}`;
   return `${a.name}|${a.day}|${a.time}|${a.location}`;
 }
-
-// Prüft die aktuell geladenen Auftrittsdaten auf strukturelle Probleme, die im
-// Live-Betrieb Ärger machen könnten (unbekannte Tage, kaputte Zeitformate,
-// fehlende Maps-Einträge, Zeit-Überschneidungen etc.). Läuft automatisch nach
-// jedem Auftritte-Update (Standard-Load, Reset, CSV-Import).
-// Behebt automatisch alle Auftritts-Probleme, bei denen es keinen Interpretations-
-// spielraum gibt (Leerzeichen, exakte Duplikate). Alles andere (unbekannte Tage/
-// Künstler, Zeit-Logikfehler, Überschneidungen etc.) wird bewusst NICHT automatisch
-// verändert, da hier eine echte Entscheidung nötig ist - das bleibt Sache von
-// validateAuftritte() zum Melden.
-
-
 
 let currentTab = 'kuenstler';
 let sortCol = 'name', sortDir = 1;
@@ -623,12 +618,10 @@ function switchTab(tab) {
   }
 }
 
-// Öffnet einen Link zuverlässig in einem neuen Tab/Fenster (Systembrowser).
 // Präzise Standortdaten (GPS-Koordinaten bzw. Adresse) der bekannten RBF-Venues,
 // direkt von der offiziellen RBF-Location-Datenbank übernommen. Damit landet
 // der Maps-Link exakt am richtigen Gebäude statt bei einer unsicheren Namenssuche
 // (wichtig v.a. bei mehrdeutigen Namen wie "25 Club" oder temporären Bühnen).
-
 function mapsUrl(location) {
   const v = VENUE_LOCATIONS[location.trim()];
   let query;
@@ -644,6 +637,7 @@ function openMaps(e, location) {
   return false;
 }
 
+// Öffnet einen Link zuverlässig in einem neuen Tab/Fenster (Systembrowser).
 // In installierten PWAs (standalone) ignoriert Android target="_blank" oft und
 // navigiert stattdessen innerhalb der App weiter - window.open() umgeht das.
 function openExternal(e, url) {
@@ -744,7 +738,7 @@ function renderGenreModalList() {
   if (!allGenreTags.length) { el.innerHTML = '<div style="color:var(--text2);font-size:13px">Keine Genres vorhanden.</div>'; return; }
   el.innerHTML = allGenreTags.map(g => {
     const checked = selectedGenres.has(g);
-    const gj = g.replace(/'/g, "\\'");
+    const gj = escJs(g);
     return `<div class="genre-check-row${checked ? ' checked' : ''}" onclick="toggleGenreSelection('${gj}')">
       <div class="genre-check-box">${checked ? '✓' : ''}</div>
       <div class="genre-check-label">${g}</div>
@@ -777,7 +771,7 @@ function updateGenreChips() {
   if (!selectedGenres.size) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
   wrap.style.display = 'flex';
   const chips = [...selectedGenres].sort((a, b) => a.localeCompare(b, 'de'))
-    .map(g => `<span class="filter-chip">${g}<span class="filter-chip-x" onclick="removeGenreChip('${g.replace(/'/g, "\\'")}')">✕</span></span>`).join('');
+    .map(g => `<span class="filter-chip">${g}<span class="filter-chip-x" onclick="removeGenreChip('${escJs(g)}')">✕</span></span>`).join('');
   wrap.innerHTML = chips + (selectedGenres.size > 1 ? `<span class="filter-chip-reset" onclick="resetGenreFilter()">Alle zurücksetzen</span>` : '');
 }
 
@@ -790,13 +784,19 @@ function getSorted(arr) {
 }
 
 // ── STARS ─────────────────────────────────────────────────────────────────────
+// Gemeinsamer Generator für klickbare Bewertungs-Sterne. Unterscheiden sich
+// nur in CSS-Klasse und dem aufgerufenen Setter (als String, da er direkt ins
+// onclick-Attribut des generierten HTML eingebettet wird).
+function ratingStarsHTML(val, cssClass, onclickFor) {
+  return Array.from({ length: MAX }, (_, i) => {
+    const n = i + 1;
+    return `<span class="${cssClass}${n <= val ? ' on' : ''}" onclick="${onclickFor(n)}">★</span>`;
+  }).join('');
+}
 function starsHTML(name, field) {
   const val = dataMap[name] ? dataMap[name][field] : 0;
-  const nj = name.replace(/'/g, "\\'");
-  return Array.from({ length: MAX }, (_, i) => {
-    const n = i + 1, isOn = n <= val;
-    return `<span class="star${isOn ? ' on' : ''}" onclick="setRating('${nj}','${field}',${n})">${'★'}</span>`;
-  }).join('');
+  const nj = escJs(name);
+  return ratingStarsHTML(val, 'star', n => `setRating('${nj}','${field}',${n})`);
 }
 function setRating(name, field, val) {
   if (!dataMap[name]) return;
@@ -806,30 +806,30 @@ function setRating(name, field, val) {
   updateStats();
   saveToStorage();
 }
+// Gemeinsamer Generator für nicht-klickbare "Mini-Sterne"-Anzeigen (Künstler-
+// Durchschnitt in der Programm-Übersicht bzw. Auftritts-Bewertungs-Zusammenfassung).
+// Unterscheiden sich nur in der CSS-Klasse für die eigene Akzentfarbe.
+function miniStarsHTML(val, cssClass) {
+  return Array.from({ length: MAX }, (_, i) => `<span class="${cssClass}${i < val ? ' on' : ''}">★</span>`).join('');
+}
 function miniStars(val) {
-  return Array.from({ length: MAX }, (_, i) => `<span class="prog-mini-star${i < val ? ' on' : ''}">★</span>`).join('');
+  return miniStarsHTML(val, 'prog-mini-star');
 }
 // Editierbare Sterne innerhalb der Programm-Detailansicht (eigener Klick-Handler,
 // da derselbe Künstler mit mehreren Auftritten gleichzeitig in der Liste stehen kann)
 function progStarsHTML(rid, name, field) {
   const val = dataMap[name] ? dataMap[name][field] : 0;
-  return Array.from({ length: MAX }, (_, i) => {
-    const n = i + 1, isOn = n <= val;
-    return `<span class="star${isOn ? ' on' : ''}" onclick="setProgRating('${rid}','${name}','${field}',${n})">★</span>`;
-  }).join('');
+  return ratingStarsHTML(val, 'star', n => `setProgRating('${rid}','${name}','${field}',${n})`);
 }
 // Auftritts-Bewertung: eigenständige Sterne-Skala pro konkreter Show (nicht pro Künstler).
 // Fließt bewusst NICHT in dataMap/rp/rl bzw. den Bewertungsdurchschnitt ein.
 function progShowStarsHTML(rid, skey) {
   const val = showRatings[skey] || 0;
-  const keyEsc = skey.replace(/'/g, "\\'");
-  return Array.from({ length: MAX }, (_, i) => {
-    const n = i + 1, isOn = n <= val;
-    return `<span class="star star-show${isOn ? ' on' : ''}" onclick="setShowRating('${rid}','${keyEsc}',${n})">★</span>`;
-  }).join('');
+  const keyEsc = escJs(skey);
+  return ratingStarsHTML(val, 'star star-show', n => `setShowRating('${rid}','${keyEsc}',${n})`);
 }
 function miniStarsShow(val) {
-  return Array.from({ length: MAX }, (_, i) => `<span class="show-mini-star${i < val ? ' on' : ''}">★</span>`).join('');
+  return miniStarsHTML(val, 'show-mini-star');
 }
 // Blendet die gemeinsame Zeile aus Auftritts-Bewertung + Dauer in der
 // eingeklappten Programm-Zeile ein/aus, je nachdem ob mindestens eine der
@@ -952,15 +952,19 @@ function setProgRating(rid, name, field, val) {
   d[field] = (d[field] === val) ? 0 : val;
   saveToStorage();
   updateStats();
-  const starsEl = document.getElementById(`${rid}-${field}`);
-  if (starsEl) starsEl.innerHTML = progStarsHTML(rid, name, field);
   const vals = [d.rp, d.rl].filter(v => v > 0);
   const avg = vals.length ? vals.reduce((x,y) => x+y, 0) / vals.length : 0;
-  const summaryEl = document.getElementById(`${rid}-summary`);
-  if (summaryEl) {
-    summaryEl.style.display = vals.length ? '' : 'none';
-    summaryEl.innerHTML = `<span>${miniStars(Math.round(avg))}</span><span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>`;
-  }
+  // Künstlerbewertung gilt für ALLE seine Auftritte - also jede aktuell
+  // sichtbare Zeile dieses Künstlers aktualisieren, nicht nur die angeklickte.
+  (progRidsByName[name] || [rid]).forEach(r => {
+    const starsEl = document.getElementById(`${r}-${field}`);
+    if (starsEl) starsEl.innerHTML = progStarsHTML(r, name, field);
+    const summaryEl = document.getElementById(`${r}-summary`);
+    if (summaryEl) {
+      summaryEl.style.display = vals.length ? '' : 'none';
+      summaryEl.innerHTML = `<span>${miniStars(Math.round(avg))}</span><span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>`;
+    }
+  });
 }
 let openProgRid = null;
 function toggleProgRating(rid) {
@@ -1062,15 +1066,20 @@ function seenButtonsHTML(nj, d, progRid) {
 }
 // Setzt den Gesehen-Status gezielt aus der Programm-Übersicht heraus, ohne die
 // komplette Liste neu zu rendern (sonst würde der aufgeklappte Bereich wieder
-// zuklappen). Aktualisiert nur die betroffene Zeile per direktem DOM-Update.
+// zuklappen). Aktualisiert per direktem DOM-Update ALLE aktuell sichtbaren
+// Zeilen dieses Künstlers (Gesehen-Status gilt künstlerweit, nicht pro Show -
+// bei mehreren gleichzeitig sichtbaren Auftritten sonst inkonsistent bis zum
+// nächsten Reload).
 function setSeenProg(rid, name, val) {
   if (!dataMap[name]) return;
   const d = dataMap[name];
   d.gesehen = (d.gesehen === val) ? '' : val;
   saveToStorage();
   updateStats();
-  const el = document.getElementById(`${rid}-seen`);
-  if (el) el.outerHTML = seenButtonsHTML(name, d, rid);
+  (progRidsByName[name] || [rid]).forEach(r => {
+    const el = document.getElementById(`${r}-seen`);
+    if (el) el.outerHTML = seenButtonsHTML(name, d, r);
+  });
 }
 
 // Aktualisiert die Gesehen-Status-Anzeige überall dort, wo der Künstler
@@ -1101,7 +1110,7 @@ function renderArtistItem(name) {
   const isExp = expandedRows.has(name);
   const shows = auftritte.filter(a => a.name === name);
   const gc = genderBadgeClass(d.geschlecht);
-  const nj = name.replace(/'/g, "\\'");
+  const nj = escJs(name);
   let html = `<div class="artist-row${d.ausgeblendet ? ' artist-row-hidden' : ''}" onclick="toggleExpand('${nj}')">
     <div class="artist-expand">${shows.length ? (isExp ? '▾' : '▸') : '·'}</div>
     <div class="artist-name">${d.name}</div>
@@ -1117,7 +1126,7 @@ function renderArtistItem(name) {
         .map((s, idx) => {
           const skey = showKey(s);
           const srid = `art-${nj}-${idx}`;
-          const locHtml = s.location ? (appSettings.showMapsLinks ? `<a href="${mapsUrl(s.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${s.location.replace(/'/g, "\\'")}')">${s.location}</a>` : s.location) : '<span style="opacity:.6">TBA</span>';
+          const locHtml = s.location ? (appSettings.showMapsLinks ? `<a href="${mapsUrl(s.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${escJs(s.location)}')">${s.location}</a>` : s.location) : '<span style="opacity:.6">TBA</span>';
           return `<div class="show-row"><div class="show-day">${s.day}</div><div class="show-time">${s.time ? s.time + (s.endTime ? '–' + s.endTime : '') : '<span style="opacity:.6">TBA</span>'}</div><div class="show-loc">${locHtml}</div><div class="stars stars-sm" id="${srid}-show">${progShowStarsHTML(srid,skey)}</div></div>`;
         }).join('');
     } else {
@@ -1152,7 +1161,7 @@ function renderArtistItem(name) {
         <div class="detail-label">Auftritte</div>
         <div class="shows-list">${showsHtml}</div>
       </div>
-      <a class="detail-link" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="return openExternal(event,'${(d.customUrl || d.rbfUrl).replace(/'/g, "\\'")}')">↗ RBF-Seite öffnen</a>
+      <a class="detail-link" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="return openExternal(event,'${escJs(d.customUrl || d.rbfUrl)}')">↗ RBF-Seite öffnen</a>
     </div>`;
   }
   container.innerHTML = html;
@@ -1302,13 +1311,19 @@ function avgRating(d) {
 // Klickbares Sterne-Widget für den Mindestbewertungs-Filter im Programm.
 // Klick auf einen Stern setzt die Mindestbewertung; nochmaliger Klick auf
 // den bereits aktiven Stern setzt den Filter zurück (= alle anzeigen).
+// Gemeinsamer Generator für die drei Sterne-Filter-Widgets (Programm-
+// Künstlerbewertung, Programm-Auftrittsbewertung, Künstler-Auftrittsbewertung).
+// Unterscheiden sich nur in Element-Id, CSS-Klasse, aktuellem Wert und
+// aufgerufenem Setter.
+function ratingFilterStarsHTML(count, cssClass, setterName) {
+  return Array.from({ length: MAX }, (_, i) => {
+    const n = i + 1;
+    return `<span class="star${cssClass}${n <= count ? ' on' : ''}" onclick="${setterName}(${n})">★</span>`;
+  }).join('');
+}
 function renderProgRatingStars() {
   const el = document.getElementById('fProgRatingStars');
-  if (!el) return;
-  el.innerHTML = Array.from({ length: MAX }, (_, i) => {
-    const n = i + 1;
-    return `<span class="star${n <= progRatingFilter ? ' on' : ''}" onclick="setProgRatingFilter(${n})">★</span>`;
-  }).join('');
+  if (el) el.innerHTML = ratingFilterStarsHTML(progRatingFilter, '', 'setProgRatingFilter');
 }
 function setProgRatingFilter(n) {
   progRatingFilter = (progRatingFilter === n) ? 0 : n;
@@ -1317,11 +1332,7 @@ function setProgRatingFilter(n) {
 }
 function renderProgShowRatingStars() {
   const el = document.getElementById('fProgShowRatingStars');
-  if (!el) return;
-  el.innerHTML = Array.from({ length: MAX }, (_, i) => {
-    const n = i + 1;
-    return `<span class="star star-show${n <= progShowRatingFilter ? ' on' : ''}" onclick="setProgShowRatingFilter(${n})">★</span>`;
-  }).join('');
+  if (el) el.innerHTML = ratingFilterStarsHTML(progShowRatingFilter, ' star-show', 'setProgShowRatingFilter');
 }
 function setProgShowRatingFilter(n) {
   progShowRatingFilter = (progShowRatingFilter === n) ? 0 : n;
@@ -1330,11 +1341,7 @@ function setProgShowRatingFilter(n) {
 }
 function renderKuenstlerShowRatingStars() {
   const el = document.getElementById('fKuenstlerShowRatingStars');
-  if (!el) return;
-  el.innerHTML = Array.from({ length: MAX }, (_, i) => {
-    const n = i + 1;
-    return `<span class="star star-show${n <= kuenstlerShowRatingFilter ? ' on' : ''}" onclick="setKuenstlerShowRatingFilter(${n})">★</span>`;
-  }).join('');
+  if (el) el.innerHTML = ratingFilterStarsHTML(kuenstlerShowRatingFilter, ' star-show', 'setKuenstlerShowRatingFilter');
 }
 function setKuenstlerShowRatingFilter(n) {
   kuenstlerShowRatingFilter = (kuenstlerShowRatingFilter === n) ? 0 : n;
@@ -1438,9 +1445,17 @@ function updateLocFilter() {
   sel.innerHTML = `<option value="">Alle Locations</option>` + locs.map(l => `<option value="${l}"${l===cur?' selected':''}>${l}</option>`).join('');
 }
 
+// Merkt sich, welche rids (Zeilen-Ids) in der aktuell gerenderten Programm-
+// Liste zu welchem Künstlernamen gehören. Notwendig, weil ein Künstler mit
+// mehreren Auftritten gleichzeitig mehrfach in der Liste stehen kann - beim
+// Ändern der (künstlerbezogenen) Bewertung/des Gesehen-Status müssen ALLE
+// seine sichtbaren Zeilen aktualisiert werden, nicht nur die angeklickte.
+let progRidsByName = {};
+
 function renderProg() {
   const list = document.getElementById('progList');
   openProgRid = null;
+  progRidsByName = {};
   if (!auftritte.length) {
     list.innerHTML = `<div class="prog-empty"><div class="icon">📅</div>Noch keine Auftrittsdaten hinterlegt.</div>`;
     updateProgTotalTime();
@@ -1458,17 +1473,19 @@ function renderProg() {
     const vals = d ? [d.rp, d.rl].filter(v => v > 0) : [];
     const avg = avgRating(d);
     const rid = `progr-${i}`;
+    if (!progRidsByName[a.name]) progRidsByName[a.name] = [];
+    progRidsByName[a.name].push(rid);
     const skey = showKey(a);
     const showRating = showRatings[skey] || 0;
     const duration = showDurations[skey];
-    const nj = a.name.replace(/'/g, "\\'");
-    const skeyEsc = skey.replace(/'/g, "\\'");
+    const nj = escJs(a.name);
+    const skeyEsc = escJs(skey);
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
         <div class="prog-name">${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(nj, d)}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
-        <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${a.location.replace(/'/g, "\\'")}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
+        <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${escJs(a.location)}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
           <span>${miniStars(Math.round(avg))}</span>
           <span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>
@@ -1487,7 +1504,7 @@ function renderProg() {
       </div>
       <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Gesehen</span>${seenButtonsHTML(nj, d, rid)}</div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
-        <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${(d.customUrl || d.rbfUrl).replace(/'/g, "\\'")}')">↗ RBF-Seite öffnen</a>
+        <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${escJs(d.customUrl || d.rbfUrl)}')">↗ RBF-Seite öffnen</a>
         <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
       </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
       <div class="prog-detail-divider"></div>
