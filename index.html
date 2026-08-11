@@ -186,6 +186,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .prog-star-group { font-size: 10px; color: var(--text3); display: flex; align-items: center; gap: 3px; }
 .prog-mini-star { font-size: 11px; color: var(--text3); }
 .prog-mini-star.on { color: var(--accent); }
+.prog-mini-star.half { background: linear-gradient(90deg, var(--accent) 50%, var(--text3) 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .prog-empty { padding: 40px 20px; text-align: center; color: var(--text2); font-size: 14px; line-height: 1.6; }
 .prog-empty .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
 
@@ -812,8 +813,15 @@ function setRating(name, field, val) {
 // Gemeinsamer Generator für nicht-klickbare "Mini-Sterne"-Anzeigen (Künstler-
 // Durchschnitt in der Programm-Übersicht bzw. Auftritts-Bewertungs-Zusammenfassung).
 // Unterscheiden sich nur in der CSS-Klasse für die eigene Akzentfarbe.
+// Unterstützt halb ausgefüllte Sterne (z.B. bei einem Durchschnitt von 3.5) -
+// bei ganzzahligen Werten (Auftritts-Bewertung, nie ein Durchschnitt) kann der
+// "half"-Zustand nie eintreten, daher unkritisch für diesen Anwendungsfall.
 function miniStarsHTML(val, cssClass) {
-  return Array.from({ length: MAX }, (_, i) => `<span class="${cssClass}${i < val ? ' on' : ''}">★</span>`).join('');
+  return Array.from({ length: MAX }, (_, i) => {
+    const diff = val - i;
+    const state = diff >= 1 ? ' on' : diff >= 0.5 ? ' half' : '';
+    return `<span class="${cssClass}${state}">★</span>`;
+  }).join('');
 }
 function miniStars(val) {
   return miniStarsHTML(val, 'prog-mini-star');
@@ -965,7 +973,7 @@ function setProgRating(rid, name, field, val) {
     const summaryEl = document.getElementById(`${r}-summary`);
     if (summaryEl) {
       summaryEl.style.display = vals.length ? '' : 'none';
-      summaryEl.innerHTML = `<span>${miniStars(Math.round(avg))}</span><span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>`;
+      summaryEl.innerHTML = `<span>${miniStars(avg)}</span><span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>`;
     }
   });
 }
@@ -1325,7 +1333,7 @@ function avgMiniStarsHTML(d) {
   const vals = [d.rp, d.rl].filter(v => v > 0);
   if (!vals.length) return `<span class="artist-avg-stars" id="avg-mini-${d.name}" style="display:none"></span>`;
   const avg = vals.reduce((x, y) => x + y, 0) / vals.length;
-  return `<span class="artist-avg-stars" id="avg-mini-${d.name}" title="Ø ${avg.toFixed(1)}">${miniStars(Math.round(avg))}</span>`;
+  return `<span class="artist-avg-stars" id="avg-mini-${d.name}" title="Ø ${avg.toFixed(1)}">${miniStars(avg)}</span>`;
 }
 
 // Klickbares Sterne-Widget für den Mindestbewertungs-Filter im Programm.
@@ -1507,7 +1515,7 @@ function renderProg() {
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
         <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${escJs(a.location)}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
-          <span>${miniStars(Math.round(avg))}</span>
+          <span>${miniStars(avg)}</span>
           <span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>
         </div>
         <div class="prog-show-meta-row" id="${rid}-showmetarow" style="${(showRating || duration !== undefined) ? '' : 'display:none'}">
