@@ -1484,13 +1484,13 @@ function updateLocFilter() {
     }
     return true;
   });
-  let locs = [...new Set(relevant.map(a => a.location).filter(Boolean))].sort();
+  let locs = [...new Set(relevant.map(a => a.location).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
   const sel = document.getElementById('locFilter');
   const cur = sel.value;
   // Die aktuell gewählte Location bleibt auswählbar, auch wenn sie im neuen
   // Zeitraum gerade keine Auftritte hat - sonst würde die Auswahl des
   // Nutzers beim Ändern von Tag/Uhrzeit unerwartet stillschweigend verworfen.
-  if (cur && !locs.includes(cur)) locs = [...locs, cur].sort();
+  if (cur && !locs.includes(cur)) locs = [...locs, cur].sort((a, b) => a.localeCompare(b, 'de'));
   sel.innerHTML = `<option value="">Alle Locations</option>` + locs.map(l => `<option value="${l}"${l===cur?' selected':''}>${l}</option>`).join('');
 }
 
