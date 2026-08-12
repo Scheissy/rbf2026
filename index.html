@@ -104,7 +104,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 
 /* ARTIST DETAIL PANEL */
 .artist-detail { background: var(--surface2); padding: 12px 16px 12px 44px; border-bottom: 1px solid var(--border); }
-.detail-genre { font-size: 12px; color: var(--text2); margin-bottom: 10px; }
+.detail-genre { font-size: 12px; color: var(--text2); flex: 1; min-width: 0; }
 .detail-section { margin-bottom: 10px; }
 .detail-ratings-row { display: flex; gap: 36px; }
 .detail-rating-col { flex-shrink: 0; }
@@ -1144,11 +1144,9 @@ function renderArtistItem(name) {
       showsHtml = '<div class="no-shows">Noch keine Auftrittsdaten</div>';
     }
     html += `<div class="artist-detail" id="detail-${name}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px">
         <div class="detail-genre">${d.genre}</div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          <button onclick="toggleHidden('${nj}')" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;cursor:pointer">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</button>
-        </div>
+        <a class="detail-link" style="margin-top:0;flex-shrink:0" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="return openExternal(event,'${escJs(d.customUrl || d.rbfUrl)}')">↗ RBF-Seite öffnen</a>
       </div>
       <div class="detail-section detail-ratings-row">
         <div class="detail-rating-col">
@@ -1169,10 +1167,12 @@ function renderArtistItem(name) {
         ${commentHTML(nj, d)}
       </div>
       <div class="detail-section">
+        <a class="detail-link" style="margin-top:0" href="#" onclick="event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
+      </div>
+      <div class="detail-section">
         <div class="detail-label">Auftritte</div>
         <div class="shows-list">${showsHtml}</div>
       </div>
-      <a class="detail-link" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="return openExternal(event,'${escJs(d.customUrl || d.rbfUrl)}')">↗ RBF-Seite öffnen</a>
     </div>`;
   }
   container.innerHTML = html;
