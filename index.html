@@ -1042,16 +1042,25 @@ function onCommentInput(name) {
     countEl.textContent = `${val.length}/${MAX_COMMENT_LEN}`;
     countEl.classList.toggle('comment-count-max', val.length >= MAX_COMMENT_LEN);
   }
+  const iconEl = document.getElementById(`comment-icon-${name}`);
+  if (iconEl) iconEl.style.display = val ? '' : 'none';
   clearTimeout(commentSaveTimers[name]);
   commentSaveTimers[name] = setTimeout(() => saveToStorage(), 500);
 }
 
-// Nur-Lese-Ansicht des Kommentars in der Programm-Übersicht: Icon wird nur
-// gerendert, wenn ein Kommentar existiert; Klick öffnet ihn als Bottom-Sheet
-// (statt echtem Hover-Tooltip, da das auf Touch-Geräten nicht funktioniert).
-function commentIconHTML(nj, d) {
-  if (!d || !d.kommentar) return '';
-  return `<button type="button" class="comment-icon-btn" onclick="event.stopPropagation();openCommentModal('${nj}')" title="Kommentar anzeigen">💬</button>`;
+// Nur-Lese-Ansicht des Kommentars (Künstler- UND Programm-Übersicht): Icon
+// wird nur angezeigt, wenn ein Kommentar existiert; Klick öffnet ihn als
+// Bottom-Sheet (statt echtem Hover-Tooltip, da das auf Touch-Geräten nicht
+// funktioniert). Stabile ID (aus dem unescapten Namen bzw. optional einem
+// idSuffix) plus "leerer" ausgeblendeter Platzhalter-Zustand, damit
+// onCommentInput() es beim Tippen sofort ein-/ausblenden kann. idSuffix wird
+// in der Programm-Übersicht genutzt (dort z.B. per rid), da ein Künstler
+// dort mit mehreren Auftritten gleichzeitig mehrfach stehen kann - ohne
+// eindeutige ID pro Zeile gäbe es doppelte HTML-IDs im DOM.
+function commentIconHTML(name, nj, d, idSuffix) {
+  const has = !!(d && d.kommentar);
+  const id = idSuffix || name;
+  return `<button type="button" class="comment-icon-btn" id="comment-icon-${id}" onclick="event.stopPropagation();openCommentModal('${nj}')" title="Kommentar anzeigen"${has ? '' : ' style="display:none"'}>💬</button>`;
 }
 function openCommentModal(name) {
   const d = dataMap[name];
@@ -1126,6 +1135,7 @@ function renderArtistItem(name) {
     <div class="artist-expand">${shows.length ? (isExp ? '▾' : '▸') : '·'}</div>
     <div class="artist-name">${d.name}${avgMiniStarsHTML(d)}</div>
     ${anchorBadgeHTML(d.name)}
+    ${commentIconHTML(name, nj, d)}
     ${d.ausgeblendet ? '<span class="badge b-hidden">🙈</span>' : ''}
     <div class="artist-country">${d.herkunft}</div>
     <div class="badge ${gc}">${d.geschlecht}</div>
@@ -1533,7 +1543,7 @@ function renderProg() {
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
-        <div class="prog-name">${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(nj, d)}</div>
+        <div class="prog-name">${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(a.name, nj, d, rid)}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
         <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${escJs(a.location)}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
