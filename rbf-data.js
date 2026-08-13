@@ -136,11 +136,15 @@ function validateAuftritte(silent) {
   nameCounts.forEach((count, name) => { if (count > 3) issues.push(`${name} hat ungewöhnlich viele Auftritte (${count}) - evtl. Mehrfach-Import?`); });
 
   if (issues.length) {
-    safeLog(`⚠️ Datenqualitäts-Check: ${issues.length} Auffälligkeit(en)`, issues);
-    if (!silent) toast(`⚠️ Datencheck: ${issues.length} Auffälligkeit(en) - siehe Settings`, false);
+    if (!silent) {
+      safeLog(`⚠️ Datenqualitäts-Check: ${issues.length} Auffälligkeit(en)`, issues);
+      toast(`⚠️ Datencheck: ${issues.length} Auffälligkeit(en) - siehe Settings`, false);
+    }
   } else {
-    safeLog('✓ Datenqualitäts-Check: keine Auffälligkeiten');
-    if (!silent) toast('✓ Datencheck: keine Auffälligkeiten gefunden');
+    if (!silent) {
+      safeLog('✓ Datenqualitäts-Check: keine Auffälligkeiten');
+      toast('✓ Datencheck: keine Auffälligkeiten gefunden');
+    }
   }
   lastValidationIssues = issues;
   updateValidationPanel();
