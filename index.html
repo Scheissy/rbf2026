@@ -102,6 +102,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .b-x { background: #0a3a1a; color: #70d4a0; }
 .b-d { background: #3a1a4a; color: #c080e0; }
 .b-hidden { background: #3a1a1a; color: #d47070; }
+.b-reinhoeren { background: #1a2f3a; color: #6cc9e8; }
 .b-anchor { background: #123a4a; color: #6cc9e8; }
 
 /* ARTIST DETAIL PANEL */
@@ -130,6 +131,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .seen-btn.active-bekannt { background: #1a2a4a; border-color: var(--blue); color: var(--blue); }
 .detail-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--accent); text-decoration: none; margin-top: 2px; }
 .detail-link:active { opacity: 0.7; }
+.detail-link-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--accent); background: none; border: none; padding: 0; margin-top: 0; margin-right: 16px; font-family: inherit; cursor: pointer; }
+.detail-link-btn:active { opacity: 0.7; }
 .comment-textarea { width: 100%; min-height: 56px; resize: vertical; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 13px; font-family: inherit; line-height: 1.4; }
 .comment-textarea::placeholder { color: var(--text3); }
 .comment-textarea:focus { outline: none; border-color: var(--accent); }
@@ -185,6 +188,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .prog-detail-divider { height: 1px; background: var(--border); margin: 8px 0; }
 .prog-detail-label { width: 70px; flex-shrink: 0; color: var(--text3); }
 .prog-detail-link { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--accent); text-decoration: none; }
+.prog-detail-link-btn { display: inline-block; font-size: 12px; color: var(--accent); background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; }
 .prog-star-group { font-size: 10px; color: var(--text3); display: flex; align-items: center; gap: 3px; }
 .prog-mini-star { font-size: 11px; color: var(--text3); }
 .prog-mini-star.on { color: var(--accent); }
@@ -314,6 +318,11 @@ input[type=file] { display: none; }
       <option value="sichtbar">Sichtbare</option>
       <option value="ausgeblendet">🙈 Ausgeblendete</option>
       <option value="alle">Alle</option>
+    </select>
+    <select class="filter" id="fReinhoeren" onchange="render()">
+      <option value="">Alle</option>
+      <option value="ja">🎧 Nochmal reinhören</option>
+      <option value="nein">Nicht markiert</option>
     </select>
     <div class="prog-rating-filter">
       <span class="prog-rating-filter-label">Auftritt:</span>
@@ -507,7 +516,7 @@ const MAX = 5;
 const MAX_COMMENT_LEN = 250;
 let dataMap = {};
 RAW.forEach(r => {
-  dataMap[r[0]] = { name:r[0], genre:r[1], herkunft:r[2], geschlecht:r[3], rbfUrl:r[4], rp:0, rl:0, gesehen:'', customUrl:'', manual:false, ausgeblendet:false, kommentar:'' };
+  dataMap[r[0]] = { name:r[0], genre:r[1], herkunft:r[2], geschlecht:r[3], rbfUrl:r[4], rp:0, rl:0, gesehen:'', customUrl:'', manual:false, ausgeblendet:false, kommentar:'', reinhoeren:false };
 });
 // Von der offiziellen RBF-API übernommene (Teil-)Programmdaten: [Künstler, Tag, Zeit, Ende, Location]
 // Zeit/Location sind leer ('') = vom Festival noch nicht final bestätigt (TBA).
@@ -548,8 +557,8 @@ let sortCol = 'name', sortDir = 1;
 function saveToStorage() {
   try {
     const payload = Object.values(dataMap)
-      .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet || d.kommentar)
-      .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false, c: d.kommentar||'' }));
+      .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet || d.kommentar || d.reinhoeren)
+      .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false, c: d.kommentar||'', rh: d.reinhoeren||false }));
     const auftrittePayload = auftritte.length ? auftritte : [];
     localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, auftritteVersion: DATA_VERSION, showRatings, showDurations, settings: appSettings }));
     document.getElementById('saveIndicator').textContent = '✓ gespeichert';
@@ -566,7 +575,7 @@ function loadFromStorage() {
       data.ratings.forEach(r => {
         // restore manual artists that aren't in RAW
         if (!dataMap[r.n] && r.manual) {
-          dataMap[r.n] = { name:r.n, genre:r.genre||'', herkunft:r.herkunft||'', geschlecht:r.geschlecht||'mixed', rbfUrl:r.rbfUrl||'', rp:0, rl:0, gesehen:'', customUrl:'', manual:true, edited:false, ausgeblendet:false, kommentar:'' };
+          dataMap[r.n] = { name:r.n, genre:r.genre||'', herkunft:r.herkunft||'', geschlecht:r.geschlecht||'mixed', rbfUrl:r.rbfUrl||'', rp:0, rl:0, gesehen:'', customUrl:'', manual:true, edited:false, ausgeblendet:false, kommentar:'', reinhoeren:false };
         }
         if (dataMap[r.n]) {
           dataMap[r.n].rp = Math.min(r.rp || 0, MAX);
@@ -577,6 +586,7 @@ function loadFromStorage() {
           dataMap[r.n].edited = r.edited || false;
           dataMap[r.n].ausgeblendet = r.h || false;
           dataMap[r.n].kommentar = (r.c || '').slice(0, MAX_COMMENT_LEN);
+          dataMap[r.n].reinhoeren = r.rh || false;
         }
       });
     }
@@ -687,6 +697,7 @@ function getFiltered() {
   const fs = document.getElementById('fSeen').value;
   const fHerkunft = document.getElementById('fHerkunft').value;
   const fHidden = document.getElementById('fHidden').value;
+  const fReinhoeren = document.getElementById('fReinhoeren').value;
   return Object.values(dataMap).filter(d => {
     if (q && !d.name.toLowerCase().includes(q) && !d.genre.toLowerCase().includes(q) && !d.herkunft.toLowerCase().includes(q)) return false;
     if (fg && d.geschlecht !== fg) return false;
@@ -697,6 +708,8 @@ function getFiltered() {
     if (fHerkunft && !splitTags(d.herkunft).includes(fHerkunft)) return false;
     if (fHidden === 'sichtbar' && d.ausgeblendet) return false;
     if (fHidden === 'ausgeblendet' && !d.ausgeblendet) return false;
+    if (fReinhoeren === 'ja' && !d.reinhoeren) return false;
+    if (fReinhoeren === 'nein' && d.reinhoeren) return false;
     if (kuenstlerShowRatingFilter > 0) {
       const hasMatch = auftritte.some(a => a.name === d.name && (showRatings[showKey(a)] || 0) >= kuenstlerShowRatingFilter);
       if (!hasMatch) return false;
@@ -1011,6 +1024,19 @@ function toggleHidden(name) {
   toast(d.ausgeblendet ? `„${name}" ausgeblendet 🙈` : `„${name}" wieder eingeblendet 👁`);
 }
 
+// Markiert einen Künstler zum "nochmal reinhören" - reine Merk-Funktion für
+// die eigene Nachbereitung, wirkt sich (anders als "Ausblenden") auf nichts
+// anderes aus. Setzen und Filtern ist bewusst nur in der Künstler-Übersicht
+// möglich, kein Pendant in der Programm-Übersicht.
+function toggleReinhoeren(name) {
+  const d = dataMap[name];
+  if (!d) return;
+  d.reinhoeren = !d.reinhoeren;
+  saveToStorage();
+  render();
+  toast(d.reinhoeren ? `„${name}" zum Reinhören markiert 🎧` : `Markierung bei „${name}" entfernt`);
+}
+
 // ── KOMMENTAR ─────────────────────────────────────────────────────────────────
 // Escaped Text für die Einbettung in HTML-Attribute/Textarea-Inhalt (kein
 // vorhandener Helper dafür im Rest der App, daher hier lokal definiert).
@@ -1139,6 +1165,7 @@ function renderArtistItem(name) {
     ${anchorBadgeHTML(d.name)}
     ${commentIconHTML(name, nj, d)}
     ${d.ausgeblendet ? '<span class="badge b-hidden">🙈</span>' : ''}
+    ${d.reinhoeren ? '<span class="badge b-reinhoeren">🎧</span>' : ''}
     <div class="artist-country">${d.herkunft}</div>
     <div class="badge ${gc}">${d.geschlecht}</div>
   </div>`;
@@ -1179,7 +1206,8 @@ function renderArtistItem(name) {
         ${commentHTML(nj, d)}
       </div>
       <div class="detail-section">
-        <a class="detail-link" style="margin-top:0" href="#" onclick="event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
+        <button type="button" class="detail-link-btn" onclick="toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</button>
+        <button type="button" class="detail-link-btn" onclick="toggleReinhoeren('${nj}')">${d.reinhoeren ? '🎧 Entmarkieren' : '🎧 Markieren'}</button>
       </div>
       <div class="detail-section">
         <div class="detail-label">Auftritte</div>
@@ -1264,6 +1292,7 @@ function resetKuenstlerFilters() {
   updateGenreChips();
   document.getElementById('fHerkunft').value = '';
   document.getElementById('fHidden').value = 'sichtbar';
+  document.getElementById('fReinhoeren').value = '';
   kuenstlerShowRatingFilter = 0;
   renderKuenstlerShowRatingStars();
   statsBewertetFilter = false;
@@ -1567,7 +1596,7 @@ function renderProg() {
       <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Gesehen</span>${seenButtonsHTML(nj, d, rid)}</div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
         <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${escJs(d.customUrl || d.rbfUrl)}')">↗ RBF-Seite öffnen</a>
-        <a class="prog-detail-link" style="margin-top:0" href="#" onclick="event.stopPropagation();event.preventDefault();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</a>
+        <button type="button" class="prog-detail-link-btn" onclick="event.stopPropagation();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</button>
       </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
       <div class="prog-detail-divider"></div>
       <div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
