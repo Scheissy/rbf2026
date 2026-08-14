@@ -1304,11 +1304,22 @@ function resetKuenstlerFilters() {
   statsReinhoerenFilter = false;
 }
 function filterByStat(kind) {
+  // Zweiter Klick auf einen bereits aktiven Filter hebt ihn wieder auf
+  // (Vergleich MUSS vor resetKuenstlerFilters() passieren, da der Reset die
+  // Flags/das Dropdown ja gerade zurücksetzt). "Gesamt" braucht das nicht -
+  // ist ohnehin nie "aktiv" markiert, landet also nie in diesem Fall.
+  const wasActive =
+    (kind === 'bewertet' && statsBewertetFilter) ||
+    (kind === 'unbewertet' && statsUnbewertetFilter) ||
+    (kind === 'reinhoeren' && statsReinhoerenFilter) ||
+    ((kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') && document.getElementById('fSeen').value === kind);
   resetKuenstlerFilters();
-  if (kind === 'bewertet') statsBewertetFilter = true;
-  else if (kind === 'unbewertet') statsUnbewertetFilter = true;
-  else if (kind === 'reinhoeren') statsReinhoerenFilter = true;
-  else if (kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') document.getElementById('fSeen').value = kind;
+  if (!wasActive) {
+    if (kind === 'bewertet') statsBewertetFilter = true;
+    else if (kind === 'unbewertet') statsUnbewertetFilter = true;
+    else if (kind === 'reinhoeren') statsReinhoerenFilter = true;
+    else if (kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') document.getElementById('fSeen').value = kind;
+  }
   render();
   const activeEl = document.querySelector('#stats .stat-active');
   if (activeEl && activeEl.scrollIntoView) activeEl.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
