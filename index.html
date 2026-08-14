@@ -319,11 +319,6 @@ input[type=file] { display: none; }
       <option value="ausgeblendet">🙈 Ausgeblendete</option>
       <option value="alle">Alle</option>
     </select>
-    <select class="filter" id="fReinhoeren" onchange="render()">
-      <option value="">Alle</option>
-      <option value="ja">🎧 Nochmal reinhören</option>
-      <option value="nein">Nicht markiert</option>
-    </select>
     <div class="prog-rating-filter">
       <span class="prog-rating-filter-label">Auftritt:</span>
       <div class="stars stars-sm" id="fKuenstlerShowRatingStars"></div>
@@ -540,6 +535,7 @@ let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (
 let kuenstlerShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Künstlerübersicht-Filter (0 = alle)
 let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
 let statsUnbewertetFilter = false; // "Nur unbewertete Künstler" (kein Promo-Rating) - über Klick auf Stat-Zeile "Unbewertet"
+let statsReinhoerenFilter = false; // "Nur zum Reinhören markierte Künstler" - über Klick auf Stat-Zeile "Reinhören"
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
 let appSettings = { showMapsLinks: true, showListening: true };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
@@ -697,7 +693,6 @@ function getFiltered() {
   const fs = document.getElementById('fSeen').value;
   const fHerkunft = document.getElementById('fHerkunft').value;
   const fHidden = document.getElementById('fHidden').value;
-  const fReinhoeren = document.getElementById('fReinhoeren').value;
   return Object.values(dataMap).filter(d => {
     if (q && !d.name.toLowerCase().includes(q) && !d.genre.toLowerCase().includes(q) && !d.herkunft.toLowerCase().includes(q)) return false;
     if (fg && d.geschlecht !== fg) return false;
@@ -708,14 +703,13 @@ function getFiltered() {
     if (fHerkunft && !splitTags(d.herkunft).includes(fHerkunft)) return false;
     if (fHidden === 'sichtbar' && d.ausgeblendet) return false;
     if (fHidden === 'ausgeblendet' && !d.ausgeblendet) return false;
-    if (fReinhoeren === 'ja' && !d.reinhoeren) return false;
-    if (fReinhoeren === 'nein' && d.reinhoeren) return false;
     if (kuenstlerShowRatingFilter > 0) {
       const hasMatch = auftritte.some(a => a.name === d.name && (showRatings[showKey(a)] || 0) >= kuenstlerShowRatingFilter);
       if (!hasMatch) return false;
     }
     if (statsBewertetFilter && !(d.rp > 0 || d.rl > 0)) return false;
     if (statsUnbewertetFilter && d.rp > 0) return false;
+    if (statsReinhoerenFilter && !d.reinhoeren) return false;
     return true;
   });
 }
@@ -1019,7 +1013,14 @@ function toggleHidden(name) {
   if (!d) return;
   d.ausgeblendet = !d.ausgeblendet;
   saveToStorage();
+  // render() ersetzt das innerHTML des scrollenden Containers selbst - das
+  // setzt scrollTop sonst unweigerlich auf 0 zurück (spürbar v.a. auf dem
+  // Handy: die gerade aufgeklappte Detailansicht wirkt dann wie "zugeklappt",
+  // ist aber nur aus dem sichtbaren Bereich gescrollt).
+  const list = document.getElementById('artistList');
+  const prevScroll = list.scrollTop;
   render();
+  list.scrollTop = prevScroll;
   if (currentTab === 'programm') renderProg();
   toast(d.ausgeblendet ? `„${name}" ausgeblendet 🙈` : `„${name}" wieder eingeblendet 👁`);
 }
@@ -1033,7 +1034,10 @@ function toggleReinhoeren(name) {
   if (!d) return;
   d.reinhoeren = !d.reinhoeren;
   saveToStorage();
+  const list = document.getElementById('artistList');
+  const prevScroll = list.scrollTop;
   render();
+  list.scrollTop = prevScroll;
   toast(d.reinhoeren ? `„${name}" zum Reinhören markiert 🎧` : `Markierung bei „${name}" entfernt`);
 }
 
@@ -1260,6 +1264,7 @@ function updateStats() {
      <div class="stat">Auftritte: <b>${auftritte.length}</b></div>
      <div class="${cls(statsBewertetFilter)}" onclick="filterByStat('bewertet')">Bewertet: <b>${all.filter(d => d.rp > 0 || d.rl > 0).length}</b></div>
      <div class="${cls(statsUnbewertetFilter)}" onclick="filterByStat('unbewertet')">Unbewertet: <b>${all.filter(d => !(d.rp > 0)).length}</b></div>
+     <div class="${cls(statsReinhoerenFilter)}" onclick="filterByStat('reinhoeren')">🎧 Reinhören: <b>${all.filter(d => d.reinhoeren).length}</b></div>
      <div class="${cls(fSeenVal === 'ja')}" onclick="filterByStat('ja')">Gesehen: <b>${all.filter(d => d.gesehen === 'ja').length}</b></div>
      <div class="${cls(fSeenVal === 'bekannt')}" onclick="filterByStat('bekannt')">Bekannt: <b>${all.filter(d => d.gesehen === 'bekannt' || d.gesehen === 'ja').length}</b></div>
      <div class="${cls(fSeenVal === 'unbekannt')}" onclick="filterByStat('unbekannt')">Unbekannt: <b>${all.filter(d => d.gesehen === '').length}</b></div>`;
@@ -1292,16 +1297,17 @@ function resetKuenstlerFilters() {
   updateGenreChips();
   document.getElementById('fHerkunft').value = '';
   document.getElementById('fHidden').value = 'sichtbar';
-  document.getElementById('fReinhoeren').value = '';
   kuenstlerShowRatingFilter = 0;
   renderKuenstlerShowRatingStars();
   statsBewertetFilter = false;
   statsUnbewertetFilter = false;
+  statsReinhoerenFilter = false;
 }
 function filterByStat(kind) {
   resetKuenstlerFilters();
   if (kind === 'bewertet') statsBewertetFilter = true;
   else if (kind === 'unbewertet') statsUnbewertetFilter = true;
+  else if (kind === 'reinhoeren') statsReinhoerenFilter = true;
   else if (kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') document.getElementById('fSeen').value = kind;
   render();
   const activeEl = document.querySelector('#stats .stat-active');
