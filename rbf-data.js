@@ -50,7 +50,7 @@ const ANCHOR_AWARD_NOMINEES=["Big Wett","Dov'è Liana","GANNA","Just For Fun","N
 // nach Match-Stärke sortiert (bester Treffer zuerst).
 const SOUND_REFERENCES=[
   {
-    "referenz": ["Blumentopf","Dendemann"],
+    "referenz": ["Blumentopf"],
     "kategorie": "Deutscher Boom-Bap / wortwitzige Crew-Rap-Tradition",
     "acts": ["Capuze"]
   },
