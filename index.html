@@ -174,6 +174,11 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .prog-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .comment-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; vertical-align: middle; flex-shrink: 0; }
 .comment-icon-btn:active { background: var(--surface2); }
+.soundref-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent; color: #6cc9e8; font-size: 12px; cursor: pointer; padding: 0; vertical-align: middle; flex-shrink: 0; }
+.soundref-icon-btn:active { background: var(--surface2); }
+.soundref-entry { border-left: 3px solid #6cc9e8; padding-left: 10px; }
+.soundref-name { font-weight: 600; font-size: 14px; color: var(--text); }
+.soundref-kategorie { font-size: 12px; color: var(--text2); margin-top: 3px; line-height: 1.4; }
 .prog-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
 .prog-loc { font-size: 11px; color: var(--accent); margin-top: 2px; }
 .prog-rating-summary { display: flex; align-items: center; gap: 5px; margin-top: 4px; }
@@ -290,6 +295,16 @@ input[type=file] { display: none; }
   </div>
 </div>
 
+<div class="modal-backdrop" id="soundRefModal" onclick="handleSoundRefBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="soundRefModalTitle">Klingt wie</div>
+      <button class="modal-close" onclick="closeSoundRefModal()">✕</button>
+    </div>
+    <div class="modal-body" id="soundRefModalBody" style="display:flex;flex-direction:column;gap:14px"></div>
+  </div>
+</div>
+
 <!-- KÜNSTLER VIEW -->
 <div id="view-kuenstler" class="view" style="display:flex;flex-direction:column">
   <div class="toolbar">
@@ -313,6 +328,9 @@ input[type=file] { display: none; }
     <button class="filter genre-filter-btn" id="fGenreBtn" onclick="openGenreModal()">🎵 Alle Genres</button>
     <select class="filter" id="fHerkunft" onchange="render()">
       <option value="">Alle Herkünfte</option>
+    </select>
+    <select class="filter" id="fSoundRef" onchange="render()">
+      <option value="">🔊 Alle Referenzen</option>
     </select>
     <select class="filter" id="fHidden" onchange="render()">
       <option value="sichtbar">Sichtbare</option>
@@ -692,6 +710,7 @@ function getFiltered() {
   const fg = document.getElementById('fGender').value;
   const fs = document.getElementById('fSeen').value;
   const fHerkunft = document.getElementById('fHerkunft').value;
+  const fSoundRef = document.getElementById('fSoundRef').value;
   const fHidden = document.getElementById('fHidden').value;
   return Object.values(dataMap).filter(d => {
     if (q && !d.name.toLowerCase().includes(q) && !d.genre.toLowerCase().includes(q) && !d.herkunft.toLowerCase().includes(q)) return false;
@@ -701,6 +720,7 @@ function getFiltered() {
     if (fs === 'unbekannt' && d.gesehen !== '') return false;
     if (selectedGenres.size > 0 && !splitTags(d.genre).some(g => selectedGenres.has(g))) return false;
     if (fHerkunft && !splitTags(d.herkunft).includes(fHerkunft)) return false;
+    if (fSoundRef && !soundReferencesFor(d.name).some(r => (r.referenz || []).includes(fSoundRef))) return false;
     if (fHidden === 'sichtbar' && d.ausgeblendet) return false;
     if (fHidden === 'ausgeblendet' && !d.ausgeblendet) return false;
     if (kuenstlerShowRatingFilter > 0) {
@@ -731,6 +751,20 @@ function updateTagFilters() {
   const curHerkunft = herkunftSel.value;
   herkunftSel.innerHTML = `<option value="">Alle Herkünfte</option>` +
     [...herkunftSet].sort((a, b) => a.localeCompare(b, 'de')).map(h => `<option value="${h}"${h === curHerkunft ? ' selected' : ''}>${h}</option>`).join('');
+  // Soundreferenz-Filter: Optionsliste kommt direkt aus SOUND_REFERENCES
+  // (rbf-data.js), nicht aus dataMap - die Liste wächst unabhängig von den
+  // Künstlerdaten selbst, daher hier bewusst eine eigene, dynamische
+  // Befüllung statt einer festen Werteliste.
+  const soundRefSel = document.getElementById('fSoundRef');
+  if (soundRefSel) {
+    const curSoundRef = soundRefSel.value;
+    const refNames = new Set();
+    if (typeof SOUND_REFERENCES !== 'undefined' && Array.isArray(SOUND_REFERENCES)) {
+      SOUND_REFERENCES.forEach(r => (r.referenz || []).forEach(n => refNames.add(n)));
+    }
+    soundRefSel.innerHTML = `<option value="">🔊 Alle Referenzen</option>` +
+      [...refNames].sort((a, b) => a.localeCompare(b, 'de')).map(n => `<option value="${n}"${n === curSoundRef ? ' selected' : ''}>${n}</option>`).join('');
+  }
 }
 // ── GENRE-MEHRFACHFILTER ────────────────────────────────────────────────────
 function openGenreModal() {
@@ -1108,6 +1142,41 @@ function handleCommentBackdropClick(e) {
   if (e.target.id === 'commentModal') closeCommentModal();
 }
 
+// ── SOUNDREFERENZEN ──────────────────────────────────────────────────────────
+// SOUND_REFERENCES kommt aus rbf-data.js: ein Array von Einträgen
+// { referenz: [Name(n)], kategorie: string, acts: [Künstlername(n)] }, das
+// bekannten Vergleichs-/Referenz-Acts eine Kurzbeschreibung zuordnet. Die
+// Liste wächst mit der Zeit (mehr Referenzen, mehr zugeordnete Acts) - daher
+// hier bewusst nichts hartverdrahtet, sondern immer dynamisch gegen das
+// Array geprüft (inkl. typeof-Schutz, falls es in rbf-data.js mal fehlt).
+// Ein Act kann theoretisch in mehreren Referenz-Einträgen auftauchen, daher
+// wird hier immer eine Liste aller Treffer zurückgegeben, nicht nur der erste.
+function soundReferencesFor(name) {
+  if (typeof SOUND_REFERENCES === 'undefined' || !Array.isArray(SOUND_REFERENCES)) return [];
+  return SOUND_REFERENCES.filter(r => Array.isArray(r.acts) && r.acts.includes(name));
+}
+function soundRefIconHTML(name) {
+  if (!soundReferencesFor(name).length) return '';
+  return `<button type="button" class="soundref-icon-btn" onclick="event.stopPropagation();openSoundRefModal('${escJs(name)}')" title="Klingt wie …">🔊</button>`;
+}
+function openSoundRefModal(name) {
+  const refs = soundReferencesFor(name);
+  if (!refs.length) return;
+  document.getElementById('soundRefModalTitle').textContent = `Klingt wie – ${name}`;
+  document.getElementById('soundRefModalBody').innerHTML = refs.map(r => `
+    <div class="soundref-entry">
+      <div class="soundref-name">${(r.referenz || []).join(' / ')}</div>
+      <div class="soundref-kategorie">${r.kategorie || ''}</div>
+    </div>`).join('');
+  document.getElementById('soundRefModal').classList.add('open');
+}
+function closeSoundRefModal() {
+  document.getElementById('soundRefModal').classList.remove('open');
+}
+function handleSoundRefBackdropClick(e) {
+  if (e.target.id === 'soundRefModal') closeSoundRefModal();
+}
+
 // Erzeugt die Gesehen-Buttons (wiederverwendet in Künstler-Ansicht)
 function seenButtonsHTML(nj, d, progRid) {
   const handler = progRid ? `setSeenProg('${progRid}','${nj}',` : `setSeen('${nj}',`;
@@ -1168,6 +1237,7 @@ function renderArtistItem(name) {
     <div class="artist-name">${d.name}${avgMiniStarsHTML(d)}</div>
     ${anchorBadgeHTML(d.name)}
     ${commentIconHTML(name, nj, d)}
+    ${soundRefIconHTML(name)}
     ${d.ausgeblendet ? '<span class="badge b-hidden">🙈</span>' : ''}
     ${d.reinhoeren ? '<span class="badge b-reinhoeren">🎧</span>' : ''}
     <div class="artist-country">${d.herkunft}</div>
@@ -1296,6 +1366,7 @@ function resetKuenstlerFilters() {
   selectedGenres.clear();
   updateGenreChips();
   document.getElementById('fHerkunft').value = '';
+  document.getElementById('fSoundRef').value = '';
   document.getElementById('fHidden').value = 'sichtbar';
   kuenstlerShowRatingFilter = 0;
   renderKuenstlerShowRatingStars();
@@ -1591,7 +1662,7 @@ function renderProg() {
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
-        <div class="prog-name">${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(a.name, nj, d, rid)}</div>
+        <div class="prog-name">${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(a.name, nj, d, rid)}${soundRefIconHTML(a.name)}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
         <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${escJs(a.location)}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
