@@ -319,12 +319,6 @@ input[type=file] { display: none; }
       <option value="divers">divers</option>
       <option value="mixed">mixed</option>
     </select>
-    <select class="filter" id="fSeen" onchange="render()">
-      <option value="">Alle</option>
-      <option value="ja">✓ Gesehen</option>
-      <option value="bekannt">👂 Bekannt (inkl. gesehen)</option>
-      <option value="unbekannt">– Unbekannt</option>
-    </select>
     <button class="filter genre-filter-btn" id="fGenreBtn" onclick="openGenreModal()">🎵 Alle Genres</button>
     <select class="filter" id="fHerkunft" onchange="render()">
       <option value="">Alle Herkünfte</option>
@@ -338,8 +332,8 @@ input[type=file] { display: none; }
       <option value="alle">Alle</option>
     </select>
     <div class="prog-rating-filter">
-      <span class="prog-rating-filter-label">Auftritt:</span>
-      <div class="stars stars-sm" id="fKuenstlerShowRatingStars"></div>
+      <span class="prog-rating-filter-label">Künstler Ø:</span>
+      <div class="stars stars-sm" id="fKuenstlerAvgFilterStars"></div>
     </div>
   </div>
   <div class="filter-chips" id="genreChips" style="display:none"></div>
@@ -550,10 +544,15 @@ let showRatings = {};
 // diesen Auftritt keine Dauer eingetragen ("keine Angabe" != "0 Minuten").
 let showDurations = {};
 let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
-let kuenstlerShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Künstlerübersicht-Filter (0 = alle)
+let kuenstlerAvgFilter = 0; // Mindest-Durchschnittsbewertung im Künstlerübersicht-Filter (0 = alle)
 let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
 let statsUnbewertetFilter = false; // "Nur unbewertete Künstler" (kein Promo-Rating) - über Klick auf Stat-Zeile "Unbewertet"
 let statsReinhoerenFilter = false; // "Nur zum Reinhören markierte Künstler" - über Klick auf Stat-Zeile "Reinhören"
+// Gesehen-Status-Filter: seit Einführung der Schnell-Filter-Kacheln
+// "Gesehen"/"Bekannt"/"Unbekannt" in der Statistik-Leiste gibt es dafür kein
+// eigenes Dropdown mehr (spart Platz in der Filter-Leiste) - der Zustand
+// lebt jetzt rein hier, gesetzt/zurückgesetzt über filterByStat().
+let kuenstlerSeenFilter = '';
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
 let appSettings = { showMapsLinks: true, showListening: true };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
@@ -708,7 +707,7 @@ function splitTags(val) {
 function getFiltered() {
   const q = document.getElementById('search').value.toLowerCase();
   const fg = document.getElementById('fGender').value;
-  const fs = document.getElementById('fSeen').value;
+  const fs = kuenstlerSeenFilter;
   const fHerkunft = document.getElementById('fHerkunft').value;
   const fSoundRef = document.getElementById('fSoundRef').value;
   const fHidden = document.getElementById('fHidden').value;
@@ -723,10 +722,7 @@ function getFiltered() {
     if (fSoundRef && !soundReferencesFor(d.name).some(r => (r.referenz || []).includes(fSoundRef))) return false;
     if (fHidden === 'sichtbar' && d.ausgeblendet) return false;
     if (fHidden === 'ausgeblendet' && !d.ausgeblendet) return false;
-    if (kuenstlerShowRatingFilter > 0) {
-      const hasMatch = auftritte.some(a => a.name === d.name && (showRatings[showKey(a)] || 0) >= kuenstlerShowRatingFilter);
-      if (!hasMatch) return false;
-    }
+    if (kuenstlerAvgFilter > 0 && avgRating(d) < kuenstlerAvgFilter) return false;
     if (statsBewertetFilter && !(d.rp > 0 || d.rl > 0)) return false;
     if (statsUnbewertetFilter && d.rp > 0) return false;
     if (statsReinhoerenFilter && !d.reinhoeren) return false;
@@ -846,12 +842,23 @@ function starsHTML(name, field) {
 function setRating(name, field, val) {
   if (!dataMap[name]) return;
   dataMap[name][field] = (dataMap[name][field] === val) ? 0 : val;
+  saveToStorage();
+  // Ist der neue Künstler-Ø-Filter aktiv, kann sich die Listenzugehörigkeit
+  // durch die geänderte Bewertung ändern -> volle Neu-Filterung nötig (mit
+  // Scroll-Erhalt, sonst wirkt eine aufgeklappte Detailansicht wie
+  // "zugeklappt" - gleiches Muster wie bei toggleHidden()/toggleReinhoeren()).
+  if (currentTab === 'kuenstler' && kuenstlerAvgFilter > 0) {
+    const list = document.getElementById('artistList');
+    const prevScroll = list.scrollTop;
+    render();
+    list.scrollTop = prevScroll;
+    return;
+  }
   const el = document.getElementById(`sr-${field}-${name}`);
   if (el) el.innerHTML = starsHTML(name, field);
   const avgEl = document.getElementById(`avg-mini-${name}`);
   if (avgEl) avgEl.outerHTML = avgMiniStarsHTML(dataMap[name]);
   updateStats();
-  saveToStorage();
 }
 // Gemeinsamer Generator für nicht-klickbare "Mini-Sterne"-Anzeigen (Künstler-
 // Durchschnitt in der Programm-Übersicht bzw. Auftritts-Bewertungs-Zusammenfassung).
@@ -916,9 +923,6 @@ function setShowRating(rid, skey, n) {
     summaryEl.innerHTML = miniStarsShow(val);
   }
   updateShowMetaRowVisibility(rid);
-  // Falls der Auftrittsbewertungs-Filter in der Künstlerübersicht aktiv ist,
-  // muss die Liste neu gefiltert werden (Künstler kann rein-/rausfallen).
-  if (currentTab === 'kuenstler' && kuenstlerShowRatingFilter > 0) render();
 }
 
 // ── AUFTRITTS-DAUER ─────────────────────────────────────────────────────────
@@ -1321,7 +1325,7 @@ function render() {
 
 function updateStats() {
   const all = Object.values(dataMap), f = getFiltered();
-  const fSeenVal = document.getElementById('fSeen').value;
+  const fSeenVal = kuenstlerSeenFilter;
   const cls = active => 'stat stat-clickable' + (active ? ' stat-active' : '');
   const statsEl = document.getElementById('stats');
   // Scrollposition merken: sonst springt die Leiste bei jedem Re-Render
@@ -1362,14 +1366,14 @@ function resetKuenstlerFilters() {
   document.getElementById('search').value = '';
   document.getElementById('searchClear').style.display = 'none';
   document.getElementById('fGender').value = '';
-  document.getElementById('fSeen').value = '';
+  kuenstlerSeenFilter = '';
   selectedGenres.clear();
   updateGenreChips();
   document.getElementById('fHerkunft').value = '';
   document.getElementById('fSoundRef').value = '';
   document.getElementById('fHidden').value = 'sichtbar';
-  kuenstlerShowRatingFilter = 0;
-  renderKuenstlerShowRatingStars();
+  kuenstlerAvgFilter = 0;
+  renderKuenstlerAvgFilterStars();
   statsBewertetFilter = false;
   statsUnbewertetFilter = false;
   statsReinhoerenFilter = false;
@@ -1377,19 +1381,19 @@ function resetKuenstlerFilters() {
 function filterByStat(kind) {
   // Zweiter Klick auf einen bereits aktiven Filter hebt ihn wieder auf
   // (Vergleich MUSS vor resetKuenstlerFilters() passieren, da der Reset die
-  // Flags/das Dropdown ja gerade zurücksetzt). "Gesamt" braucht das nicht -
-  // ist ohnehin nie "aktiv" markiert, landet also nie in diesem Fall.
+  // Flags ja gerade zurücksetzt). "Gesamt" braucht das nicht - ist ohnehin
+  // nie "aktiv" markiert, landet also nie in diesem Fall.
   const wasActive =
     (kind === 'bewertet' && statsBewertetFilter) ||
     (kind === 'unbewertet' && statsUnbewertetFilter) ||
     (kind === 'reinhoeren' && statsReinhoerenFilter) ||
-    ((kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') && document.getElementById('fSeen').value === kind);
+    ((kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') && kuenstlerSeenFilter === kind);
   resetKuenstlerFilters();
   if (!wasActive) {
     if (kind === 'bewertet') statsBewertetFilter = true;
     else if (kind === 'unbewertet') statsUnbewertetFilter = true;
     else if (kind === 'reinhoeren') statsReinhoerenFilter = true;
-    else if (kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') document.getElementById('fSeen').value = kind;
+    else if (kind === 'ja' || kind === 'bekannt' || kind === 'unbekannt') kuenstlerSeenFilter = kind;
   }
   render();
   const activeEl = document.querySelector('#stats .stat-active');
@@ -1496,13 +1500,13 @@ function setProgShowRatingFilter(n) {
   renderProgShowRatingStars();
   renderProg();
 }
-function renderKuenstlerShowRatingStars() {
-  const el = document.getElementById('fKuenstlerShowRatingStars');
-  if (el) el.innerHTML = ratingFilterStarsHTML(kuenstlerShowRatingFilter, ' star-show', 'setKuenstlerShowRatingFilter');
+function renderKuenstlerAvgFilterStars() {
+  const el = document.getElementById('fKuenstlerAvgFilterStars');
+  if (el) el.innerHTML = ratingFilterStarsHTML(kuenstlerAvgFilter, '', 'setKuenstlerAvgFilter');
 }
-function setKuenstlerShowRatingFilter(n) {
-  kuenstlerShowRatingFilter = (kuenstlerShowRatingFilter === n) ? 0 : n;
-  renderKuenstlerShowRatingStars();
+function setKuenstlerAvgFilter(n) {
+  kuenstlerAvgFilter = (kuenstlerAvgFilter === n) ? 0 : n;
+  renderKuenstlerAvgFilterStars();
   render();
 }
 
@@ -1742,7 +1746,7 @@ updateTagFilters();
 buildTimeDropdowns();
 renderProgRatingStars();
 renderProgShowRatingStars();
-renderKuenstlerShowRatingStars();
+renderKuenstlerAvgFilterStars();
 render();
 updateStats();
 validateAuftritte(true);
