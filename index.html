@@ -839,19 +839,30 @@ function starsHTML(name, field) {
   const nj = escJs(name);
   return ratingStarsHTML(val, 'star', n => `setRating('${nj}','${field}',${n})`);
 }
+// Führt render() der Künstlerliste aus, ohne dass dabei die Scrollposition
+// verloren geht: render() ersetzt das innerHTML des scrollenden Containers
+// selbst, was scrollTop sonst hart auf 0 zurücksetzt (spürbar v.a. auf dem
+// Handy: eine aufgeklappte Detailansicht wirkt dann wie "zugeklappt", ist
+// aber nur aus dem sichtbaren Bereich gescrollt). Einmaliges, synchrones
+// Rücksetzen reicht auf manchen mobilen Browsern nicht zuverlässig aus, wenn
+// noch eine Momentum-Scroll-Bewegung im Gange ist und den gesetzten Wert
+// gleich wieder überschreibt - daher zusätzlich ein zweiter Versuch im
+// nächsten Frame.
+function renderKuenstlerPreservingScroll() {
+  const list = document.getElementById('artistList');
+  const prevScroll = list.scrollTop;
+  render();
+  list.scrollTop = prevScroll;
+  requestAnimationFrame(() => { list.scrollTop = prevScroll; });
+}
 function setRating(name, field, val) {
   if (!dataMap[name]) return;
   dataMap[name][field] = (dataMap[name][field] === val) ? 0 : val;
   saveToStorage();
-  // Ist der neue Künstler-Ø-Filter aktiv, kann sich die Listenzugehörigkeit
-  // durch die geänderte Bewertung ändern -> volle Neu-Filterung nötig (mit
-  // Scroll-Erhalt, sonst wirkt eine aufgeklappte Detailansicht wie
-  // "zugeklappt" - gleiches Muster wie bei toggleHidden()/toggleReinhoeren()).
+  // Ist der Künstler-Ø-Filter aktiv, kann sich die Listenzugehörigkeit durch
+  // die geänderte Bewertung ändern -> volle Neu-Filterung nötig.
   if (currentTab === 'kuenstler' && kuenstlerAvgFilter > 0) {
-    const list = document.getElementById('artistList');
-    const prevScroll = list.scrollTop;
-    render();
-    list.scrollTop = prevScroll;
+    renderKuenstlerPreservingScroll();
     return;
   }
   const el = document.getElementById(`sr-${field}-${name}`);
@@ -1051,14 +1062,7 @@ function toggleHidden(name) {
   if (!d) return;
   d.ausgeblendet = !d.ausgeblendet;
   saveToStorage();
-  // render() ersetzt das innerHTML des scrollenden Containers selbst - das
-  // setzt scrollTop sonst unweigerlich auf 0 zurück (spürbar v.a. auf dem
-  // Handy: die gerade aufgeklappte Detailansicht wirkt dann wie "zugeklappt",
-  // ist aber nur aus dem sichtbaren Bereich gescrollt).
-  const list = document.getElementById('artistList');
-  const prevScroll = list.scrollTop;
-  render();
-  list.scrollTop = prevScroll;
+  renderKuenstlerPreservingScroll();
   if (currentTab === 'programm') renderProg();
   toast(d.ausgeblendet ? `„${name}" ausgeblendet 🙈` : `„${name}" wieder eingeblendet 👁`);
 }
@@ -1072,10 +1076,7 @@ function toggleReinhoeren(name) {
   if (!d) return;
   d.reinhoeren = !d.reinhoeren;
   saveToStorage();
-  const list = document.getElementById('artistList');
-  const prevScroll = list.scrollTop;
-  render();
-  list.scrollTop = prevScroll;
+  renderKuenstlerPreservingScroll();
   toast(d.reinhoeren ? `„${name}" zum Reinhören markiert 🎧` : `Markierung bei „${name}" entfernt`);
 }
 
