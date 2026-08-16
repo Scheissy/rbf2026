@@ -298,7 +298,7 @@ input[type=file] { display: none; }
 <div class="modal-backdrop" id="soundRefModal" onclick="handleSoundRefBackdropClick(event)">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="soundRefModalTitle">Klingt wie</div>
+      <div class="modal-title" id="soundRefModalTitle">Soundreferenz</div>
       <button class="modal-close" onclick="closeSoundRefModal()">✕</button>
     </div>
     <div class="modal-body" id="soundRefModalBody" style="display:flex;flex-direction:column;gap:14px"></div>
@@ -1167,10 +1167,10 @@ function soundRefIconHTML(name) {
 function openSoundRefModal(name) {
   const refs = soundReferencesFor(name);
   if (!refs.length) return;
-  document.getElementById('soundRefModalTitle').textContent = `Klingt wie – ${name}`;
+  document.getElementById('soundRefModalTitle').textContent = name;
   document.getElementById('soundRefModalBody').innerHTML = refs.map(r => `
     <div class="soundref-entry">
-      <div class="soundref-name">${(r.referenz || []).join(' / ')}</div>
+      <div class="soundref-name">🔊 Klingt wie: ${(r.referenz || []).join(' / ')}</div>
       <div class="soundref-kategorie">${r.kategorie || ''}</div>
     </div>`).join('');
   document.getElementById('soundRefModal').classList.add('open');
