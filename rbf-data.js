@@ -83,6 +83,31 @@ const SOUND_REFERENCES=[
     "referenz": ["Jazzbois"],
     "kategorie": "Improvisierendes Jazz-Trio mit Hip-Hop-Beats und Broken-Beat-Grooves",
     "acts": ["Moses Yoofee Trio"]
+  },
+  {
+    "referenz": ["Paula Hartmann"],
+    "kategorie": "Intimer, deutschsprachiger Coming-of-Age-Pop mit direkten, schonungslos persönlichen Texten",
+    "acts": ["Clara John","Carla Ahad"]
+  },
+  {
+    "referenz": ["Everyone You Know"],
+    "kategorie": "Britisches Storytelling-Duo/-Band: Hip-Hop, Punk und Rave zu eingängigen, tanzbaren Pop-Hooks über Alltagsrealität",
+    "acts": ["My First Time"]
+  },
+  {
+    "referenz": ["Sketches on Duality"],
+    "kategorie": "Vokal-/Rap-getriebenes Hip-Hop-Jazz-Bandkollektiv mit Funk-, Soul- und Spoken-Word-Anteil",
+    "acts": ["Sonic Interventions"]
+  },
+  {
+    "referenz": ["Nina June"],
+    "kategorie": "Kinoreifer, atmosphärischer Art-Pop mit außergewöhnlicher Stimme und introspektiven, symbolschweren Texten",
+    "acts": ["Tara Nome Doyle"]
+  },
+  {
+    "referenz": ["The Haunted Youth"],
+    "kategorie": "Melancholischer Dream-Pop/Shoegaze mit dunklen, atmosphärischen Gitarren-Synth-Landschaften",
+    "acts": ["White Flowers"]
   }
 ];
 
