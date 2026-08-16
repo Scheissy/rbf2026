@@ -1078,12 +1078,19 @@ function toggleHidden(name) {
 // die eigene Nachbereitung, wirkt sich (anders als "Ausblenden") auf nichts
 // anderes aus. Setzen und Filtern ist bewusst nur in der Künstler-Übersicht
 // möglich, kein Pendant in der Programm-Übersicht.
+// Aktualisiert bewusst nur die eine Zeile (statt die ganze Liste neu zu
+// filtern) - analog zu setRating() bei den Bewertet/Unbewertet-Kacheln: der
+// gerade bearbeitete Künstler bleibt sichtbar, auch wenn er durch die
+// Änderung nicht mehr zum aktiven "Reinhören"-Filter passt. Kein abruptes
+// Verschwinden mitten in der Bearbeitung - der Filter greift erst wieder
+// beim nächsten regulären Neu-Rendern (Tab-Wechsel, anderer Filter, Reset).
 function toggleReinhoeren(name) {
   const d = dataMap[name];
   if (!d) return;
   d.reinhoeren = !d.reinhoeren;
   saveToStorage();
-  renderKuenstlerPreservingScroll();
+  renderArtistItem(name);
+  updateStats();
   toast(d.reinhoeren ? `„${name}" zum Reinhören markiert 🎧` : `Markierung bei „${name}" entfernt`);
 }
 
