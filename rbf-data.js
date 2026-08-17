@@ -143,6 +143,16 @@ const SOUND_REFERENCES=[
     "referenz": ["Iron and Wine"],
     "kategorie": "Intimer, unpolierter Akustik-Folk mit warmer Stimme und storytelling-fokussierten Songs",
     "acts": ["Dermot Henry"]
+  },
+  {
+    "referenz": ["Roosevelt"],
+    "kategorie": "Warmer, nostalgischer Disco/House-Pop mit sonnendurchfluteter Balearic-Ästhetik",
+    "acts": ["Dov'è Liana"]
+  },
+  {
+    "referenz": ["D/troit"],
+    "kategorie": "Bewusst rekonstruierter 60er/70er-Motown-Soul-Sound mit klassischer Analog-Instrumentierung und Live-Band",
+    "acts": ["Cinnamon Gum"]
   }
 ];
 
