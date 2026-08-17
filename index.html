@@ -47,12 +47,15 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 /* TOOLBAR */
-.toolbar { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 8px 12px; display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+.toolbar { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
 .search-wrap { flex: 1; min-width: 140px; position: relative; }
 .search-wrap input { width: 100%; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 30px 0 10px; color: var(--text); font-size: 14px; }
 .search-wrap input::placeholder { color: var(--text3); }
 .search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; border-radius: 50%; background: var(--surface2); color: var(--text2); font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .search-clear:active { background: var(--border); }
+.filter-reset-btn { display: none; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--accent); background: var(--surface); color: var(--accent); font-size: 13px; line-height: 1; cursor: pointer; flex-shrink: 0; padding: 0; }
+.filter-reset-btn.show { display: flex; }
+.filter-reset-btn:active { background: var(--surface2); }
 select.filter, .filter { height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 8px; color: var(--text); font-size: 13px; font-family: inherit; }
 button.filter { cursor: pointer; white-space: nowrap; }
 
@@ -312,6 +315,7 @@ input[type=file] { display: none; }
       <input type="text" id="search" placeholder="Suchen …" oninput="onSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
       <span class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</span>
     </div>
+    <button type="button" class="filter-reset-btn" id="filterResetBtn" onclick="filterByStat('gesamt')" title="Alle Filter zurücksetzen">↺</button>
     <select class="filter" id="fGender" onchange="render()">
       <option value="">Alle</option>
       <option value="männlich">männlich</option>
@@ -1355,11 +1359,31 @@ function render() {
   updateStats();
 }
 
+// Prüft, ob in der Künstler-Übersicht aktuell irgendein Filter von seinem
+// Standardwert abweicht - unabhängig davon, ob er die Liste gerade tatsächlich
+// einschränkt (z.B. "Ausgeblendete" bei 0 ausgeblendeten Künstlern wäre
+// technisch "aktiv", auch wenn sich an der Anzahl nichts ändert).
+function kuenstlerFiltersActive() {
+  return !!(
+    document.getElementById('search').value ||
+    document.getElementById('fGender').value ||
+    kuenstlerSeenFilter ||
+    selectedGenres.size > 0 ||
+    document.getElementById('fHerkunft').value ||
+    document.getElementById('fSoundRef').value ||
+    document.getElementById('fHidden').value !== 'sichtbar' ||
+    kuenstlerAvgFilter > 0 ||
+    statsBewertetFilter ||
+    statsUnbewertetFilter ||
+    statsReinhoerenFilter
+  );
+}
 function updateStats() {
   const all = Object.values(dataMap), f = getFiltered();
   const fSeenVal = kuenstlerSeenFilter;
   const cls = active => 'stat stat-clickable' + (active ? ' stat-active' : '');
   const statsEl = document.getElementById('stats');
+  document.getElementById('filterResetBtn').classList.toggle('show', kuenstlerFiltersActive());
   // Scrollposition merken: sonst springt die Leiste bei jedem Re-Render
   // (z.B. direkt nach Klick auf eine nach rechts gescrollte Kachel) auf
   // Anfang zurück, weil innerHTML komplett neu aufgebaut wird.
