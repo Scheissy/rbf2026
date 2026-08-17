@@ -108,6 +108,41 @@ const SOUND_REFERENCES=[
     "referenz": ["The Haunted Youth"],
     "kategorie": "Melancholischer Dream-Pop/Shoegaze mit dunklen, atmosphärischen Gitarren-Synth-Landschaften",
     "acts": ["White Flowers"]
+  },
+  {
+    "referenz": ["Umme Block"],
+    "kategorie": "Deutschsprachiges Electronic-Duo: analoge Synths, Live-Gitarre und sphärischer Dream-Pop/Wave-Sound",
+    "acts": ["Das Beat"]
+  },
+  {
+    "referenz": ["BLOND"],
+    "kategorie": "Deutschsprachiger, feministisch-gesellschaftskritischer Punk-Pop mit theatralischer Ironie",
+    "acts": ["Remote Bondage"]
+  },
+  {
+    "referenz": ["Durry"],
+    "kategorie": "Nostalgischer, catchy Pop-Punk mit bodenständigen, ehrlichen Texten und großem Sing-Along-Faktor",
+    "acts": ["Slackrr"]
+  },
+  {
+    "referenz": ["Catt"],
+    "kategorie": "Warmer, genreoffener Indie-Folk-Pop mit introspektivem Songwriting einer Multiinstrumentalistin",
+    "acts": ["Port Noo"]
+  },
+  {
+    "referenz": ["Chef'Special"],
+    "kategorie": "Energiegeladene Genre-Fusion aus Funk, Hip-Hop, Pop und Rock mit großem Festival-Party-Faktor",
+    "acts": ["Playlunch"]
+  },
+  {
+    "referenz": ["Ebow"],
+    "kategorie": "Politisch-gesellschaftskritischer Rap mit Diaspora-Identität und Oldschool-Produktion statt Trap-Glanz",
+    "acts": ["Vasil"]
+  },
+  {
+    "referenz": ["Iron and Wine"],
+    "kategorie": "Intimer, unpolierter Akustik-Folk mit warmer Stimme und storytelling-fokussierten Songs",
+    "acts": ["Dermot Henry"]
   }
 ];
 
