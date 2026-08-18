@@ -153,6 +153,26 @@ const SOUND_REFERENCES=[
     "referenz": ["D/troit"],
     "kategorie": "Bewusst rekonstruierter 60er/70er-Motown-Soul-Sound mit klassischer Analog-Instrumentierung und Live-Band",
     "acts": ["Cinnamon Gum"]
+  },
+  {
+    "referenz": ["Norah Jones"],
+    "kategorie": "Warme, gealterte Jazz-/Folk-Stimme über reduzierter, akustischer Instrumentierung",
+    "acts": ["Le Ren"]
+  },
+  {
+    "referenz": ["Supershirt"],
+    "kategorie": "Deutschsprachiges, ironisches 'AlkoPop': Electroclash, Hip-Hop und Pop mit Party-Trash-Texten",
+    "acts": ["GbR"]
+  },
+  {
+    "referenz": ["Tocotronic"],
+    "kategorie": "Deutschsprachiger Gitarren-Indie-Rock im Spannungsfeld zwischen Ironie und echtem Gefühl (Hamburger Schule)",
+    "acts": ["Schluma","Die Sauna"]
+  },
+  {
+    "referenz": ["Angus & Julia Stone"],
+    "kategorie": "Geschwister-Duo mit warmem, akustischem Indie-Folk, ineinander verwobenen Stimmen und autobiografischen Texten",
+    "acts": ["Amistat"]
   }
 ];
 
