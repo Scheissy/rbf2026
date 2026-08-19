@@ -308,6 +308,37 @@ input[type=file] { display: none; }
   </div>
 </div>
 
+<div class="modal-backdrop" id="locModal" onclick="handleLocBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Locations filtern</div>
+      <button class="modal-close" onclick="closeLocModal()">✕</button>
+    </div>
+    <div class="modal-body" id="locModalList" style="gap:0"></div>
+    <div class="modal-footer">
+      <button class="form-btn form-btn-cancel" onclick="resetLocFilter()">Zurücksetzen</button>
+      <button class="form-btn form-btn-save" onclick="closeLocModal()">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="locManageModal" onclick="handleLocManageBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Locations verwalten</div>
+      <button class="modal-close" onclick="closeLocManageModal()">✕</button>
+    </div>
+    <div style="padding:0 20px 10px;font-size:12px;color:var(--text2);line-height:1.5">
+      Abgewählte Locations werden komplett aus der Programm-Übersicht ausgeblendet (auch ihre Auftritte). Die Künstler-Übersicht bleibt davon unberührt.
+    </div>
+    <div class="modal-body" id="locManageModalList" style="gap:0"></div>
+    <div class="modal-footer">
+      <button class="form-btn form-btn-cancel" onclick="resetLocManage()">Alle anzeigen</button>
+      <button class="form-btn form-btn-save" onclick="closeLocManageModal()">Fertig</button>
+    </div>
+  </div>
+</div>
+
 <!-- KÜNSTLER VIEW -->
 <div id="view-kuenstler" class="view" style="display:flex;flex-direction:column">
   <div class="toolbar">
@@ -365,8 +396,9 @@ input[type=file] { display: none; }
     <div class="prog-row2">
       <select id="timeFrom" onchange="renderProg()"></select>
       <select id="timeTo" onchange="renderProg()"></select>
-      <select id="locFilter" onchange="renderProg()" style="flex:1.5"></select>
+      <button class="filter genre-filter-btn" id="locFilterBtn" onclick="openLocModal()" style="flex:1.5">📍 Alle Locations</button>
     </div>
+    <div class="filter-chips" id="locChips" style="display:none"></div>
     <div class="prog-row2">
       <div class="prog-rating-filter">
         <span class="prog-rating-filter-label">Künstler Ø:</span>
@@ -424,6 +456,16 @@ input[type=file] { display: none; }
         </div>
         <input type="checkbox" id="settingShowSoundRef" checked onchange="toggleSetting('showSoundRef', this.checked)">
       </label>
+    </div>
+
+    <div class="io-section">
+      <div class="io-section-title">📍 Locations</div>
+      <div style="padding:14px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
+          Wählt aus, welche Locations in der Programm-Übersicht auftauchen sollen. Betrifft nicht die Künstler-Übersicht.
+        </div>
+        <button class="prog-quick-btn" onclick="openLocManageModal()" style="width:100%">📍 Locations verwalten</button>
+      </div>
     </div>
 
     <div class="io-section">
@@ -565,8 +607,10 @@ let statsReinhoerenFilter = false; // "Nur zum Reinhören markierte Künstler" -
 // lebt jetzt rein hier, gesetzt/zurückgesetzt über filterByStat().
 let kuenstlerSeenFilter = '';
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
-let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true };
+let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [] };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
+let selectedLocs = new Set(); // Mehrfachauswahl im Location-Filter der Programm-Übersicht (leer = alle)
+let locFilterOptions = []; // aktuell (nach Tag/Uhrzeit) verfügbare Locations fürs Modal
 let allGenreTags = []; // aktuell vorkommende Genre-Tags, alphabetisch sortiert
 
 function showKey(a) {
@@ -998,14 +1042,18 @@ function getFilteredAuftritte() {
   const days = activeDays();
   const fromVal = document.getElementById('timeFrom').value;
   const toVal = document.getElementById('timeTo').value;
-  const locVal = document.getElementById('locFilter').value;
   const showHidden = document.getElementById('progShowHidden').checked;
   const minRating = progRatingFilter;
   const statusVal = document.getElementById('fProgStatus').value;
   const durationOnly = document.getElementById('fProgDuration').checked;
   return auftritte.filter(a => {
     if (!days.includes(a.day)) return false;
-    if (locVal && a.location !== locVal) return false;
+    // Persistente Locations-Verwaltung (Settings): komplett ausgeblendete
+    // Locations gelten immer, unabhängig vom temporären Location-Filter oben
+    // - bewusst NICHT Teil von "Filter zurücksetzen", da es sich eher um eine
+    // dauerhafte Anzeige-Einstellung handelt als um einen Sitzungsfilter.
+    if (appSettings.hiddenLocations.includes(a.location)) return false;
+    if (selectedLocs.size > 0 && !selectedLocs.has(a.location)) return false;
     const d = dataMap[a.name];
     if (!showHidden && d?.ausgeblendet) return false;
     if (a.time) {
@@ -1632,7 +1680,7 @@ function resetProgFilters() {
   document.querySelectorAll('.day-btn').forEach(b => b.classList.add('active'));
   document.getElementById('timeFrom').value = '08:00';
   document.getElementById('timeTo').value = '';
-  document.getElementById('locFilter').value = '';
+  selectedLocs.clear();
   document.getElementById('fProgStatus').value = '';
   document.getElementById('fProgDuration').checked = false;
   progRatingFilter = 0;
@@ -1656,7 +1704,7 @@ function jumpToNow() {
   // Alle weiteren Filter zurücksetzen, damit "Jetzt" wirklich die volle
   // aktuelle Übersicht zeigt und nicht durch alte Location-/Bewertungs-/
   // Status-Filter verzerrt wird. "Ausgeblendete anzeigen" bleibt unangetastet.
-  document.getElementById('locFilter').value = '';
+  selectedLocs.clear();
   document.getElementById('fProgStatus').value = '';
   document.getElementById('fProgDuration').checked = false;
   progRatingFilter = 0;
@@ -1673,26 +1721,136 @@ function jumpToNow() {
 // (Bewertung, Gesehen-Status, Dauer etc.), damit die Auswahl nicht unnötig
 // stark schrumpft. Wird bei jedem renderProg()-Aufruf neu berechnet, reagiert
 // also live auf Tag-Buttons und Uhrzeit-Dropdowns.
+// Location-Filter zeigt nur Spielstätten, die im aktuell gewählten Zeitraum
+// (Festival-Tag(e) + Uhrzeit von/bis) tatsächlich Auftritte haben - bewusst
+// NUR nach Tag/Uhrzeit eingegrenzt, nicht nach den übrigen Programm-Filtern
+// (Bewertung, Gesehen-Status, Dauer etc.), damit die Auswahl nicht unnötig
+// stark schrumpft. Wird bei jedem renderProg()-Aufruf neu berechnet, reagiert
+// also live auf Tag-Buttons und Uhrzeit-Dropdowns. Mehrfachauswahl per Modal
+// (analog zum Genre-Filter) - bereits ausgewählte Locations bleiben auch dann
+// im Modal auswählbar/angehakt, wenn sie im neuen Zeitraum gerade keine
+// Auftritte haben, damit Tag/Uhrzeit-Änderungen die Auswahl nicht
+// stillschweigend verwerfen.
 function updateLocFilter() {
   const days = activeDays();
   const fromVal = document.getElementById('timeFrom').value;
   const toVal = document.getElementById('timeTo').value;
   const relevant = auftritte.filter(a => {
     if (!days.includes(a.day)) return false;
+    if (appSettings.hiddenLocations.includes(a.location)) return false;
     if (a.time) {
       if (fromVal && timeSortValue(a.time) < timeSortValue(fromVal)) return false;
       if (toVal && timeSortValue(a.time) > timeSortValue(toVal)) return false;
     }
     return true;
   });
-  let locs = [...new Set(relevant.map(a => a.location).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
-  const sel = document.getElementById('locFilter');
-  const cur = sel.value;
-  // Die aktuell gewählte Location bleibt auswählbar, auch wenn sie im neuen
-  // Zeitraum gerade keine Auftritte hat - sonst würde die Auswahl des
-  // Nutzers beim Ändern von Tag/Uhrzeit unerwartet stillschweigend verworfen.
-  if (cur && !locs.includes(cur)) locs = [...locs, cur].sort((a, b) => a.localeCompare(b, 'de'));
-  sel.innerHTML = `<option value="">Alle Locations</option>` + locs.map(l => `<option value="${l}"${l===cur?' selected':''}>${l}</option>`).join('');
+  let locs = [...new Set(relevant.map(a => a.location).filter(Boolean))];
+  [...selectedLocs].forEach(l => { if (!locs.includes(l)) locs.push(l); });
+  locFilterOptions = locs.sort((a, b) => a.localeCompare(b, 'de'));
+  renderLocModalList();
+  updateLocChips();
+}
+function renderLocModalList() {
+  const el = document.getElementById('locModalList');
+  if (!el) return;
+  if (!locFilterOptions.length) { el.innerHTML = '<div style="color:var(--text2);font-size:13px">Keine Locations vorhanden.</div>'; return; }
+  el.innerHTML = locFilterOptions.map(l => {
+    const checked = selectedLocs.has(l);
+    const lj = escJs(l);
+    return `<div class="genre-check-row${checked ? ' checked' : ''}" onclick="toggleLocSelection('${lj}')">
+      <div class="genre-check-box">${checked ? '✓' : ''}</div>
+      <div class="genre-check-label">${l}</div>
+    </div>`;
+  }).join('');
+}
+function toggleLocSelection(l) {
+  if (selectedLocs.has(l)) selectedLocs.delete(l); else selectedLocs.add(l);
+  renderLocModalList();
+  updateLocChips();
+  renderProg();
+}
+function removeLocChip(l) {
+  selectedLocs.delete(l);
+  updateLocChips();
+  renderLocModalList();
+  renderProg();
+}
+function resetLocFilter() {
+  selectedLocs.clear();
+  updateLocChips();
+  renderLocModalList();
+  renderProg();
+}
+function updateLocChips() {
+  const btn = document.getElementById('locFilterBtn');
+  if (btn) btn.textContent = selectedLocs.size ? `📍 Location (${selectedLocs.size})` : '📍 Alle Locations';
+  const wrap = document.getElementById('locChips');
+  if (!wrap) return;
+  if (!selectedLocs.size) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  wrap.style.display = 'flex';
+  const chips = [...selectedLocs].sort((a, b) => a.localeCompare(b, 'de'))
+    .map(l => `<span class="filter-chip">${l}<span class="filter-chip-x" onclick="removeLocChip('${escJs(l)}')">✕</span></span>`).join('');
+  wrap.innerHTML = chips + (selectedLocs.size > 1 ? `<span class="filter-chip-reset" onclick="resetLocFilter()">Alle zurücksetzen</span>` : '');
+}
+function openLocModal() {
+  renderLocModalList();
+  document.getElementById('locModal').classList.add('open');
+}
+function closeLocModal() {
+  document.getElementById('locModal').classList.remove('open');
+}
+function handleLocBackdropClick(e) {
+  if (e.target.id === 'locModal') closeLocModal();
+}
+
+// ── LOCATIONS VERWALTEN (Settings) ─────────────────────────────────────────────
+// Persistente, geräteweite Anzeige-Einstellung: welche Locations sollen in der
+// Programm-Übersicht überhaupt jemals erscheinen? Anders als der temporäre
+// Location-Filter oben (der bei "Filter zurücksetzen" wieder aufgehoben wird)
+// ist das eine dauerhafte Einstellung, in appSettings gespeichert. Betrifft
+// bewusst NUR die Programm-Übersicht - die Künstler-Übersicht (inkl. der
+// Auftritts-Liste in der Detailansicht) zeigt immer alle Auftritte, unabhängig
+// von dieser Einstellung.
+function allLocationNames() {
+  return [...new Set(auftritte.map(a => a.location).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+}
+function renderLocManageModalList() {
+  const el = document.getElementById('locManageModalList');
+  if (!el) return;
+  const locs = allLocationNames();
+  if (!locs.length) { el.innerHTML = '<div style="color:var(--text2);font-size:13px">Keine Locations vorhanden.</div>'; return; }
+  el.innerHTML = locs.map(l => {
+    const visible = !appSettings.hiddenLocations.includes(l);
+    const lj = escJs(l);
+    return `<div class="genre-check-row${visible ? ' checked' : ''}" onclick="toggleLocVisibility('${lj}')">
+      <div class="genre-check-box">${visible ? '✓' : ''}</div>
+      <div class="genre-check-label">${l}</div>
+    </div>`;
+  }).join('');
+}
+function toggleLocVisibility(l) {
+  const idx = appSettings.hiddenLocations.indexOf(l);
+  if (idx === -1) appSettings.hiddenLocations.push(l);
+  else appSettings.hiddenLocations.splice(idx, 1);
+  saveToStorage();
+  renderLocManageModalList();
+  if (currentTab === 'programm') renderProg();
+}
+function resetLocManage() {
+  appSettings.hiddenLocations = [];
+  saveToStorage();
+  renderLocManageModalList();
+  if (currentTab === 'programm') renderProg();
+}
+function openLocManageModal() {
+  renderLocManageModalList();
+  document.getElementById('locManageModal').classList.add('open');
+}
+function closeLocManageModal() {
+  document.getElementById('locManageModal').classList.remove('open');
+}
+function handleLocManageBackdropClick(e) {
+  if (e.target.id === 'locManageModal') closeLocManageModal();
 }
 
 // Merkt sich, welche rids (Zeilen-Ids) in der aktuell gerenderten Programm-
