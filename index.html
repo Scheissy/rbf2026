@@ -208,6 +208,13 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .io-view { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .io-section { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
 .io-section-title { padding: 12px 14px; font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); background: var(--surface2); }
+.install-tabs { display: flex; gap: 6px; padding: 0 20px 10px; flex-wrap: wrap; }
+.install-tab { font-size: 12px; padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); cursor: pointer; }
+.install-tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+.install-steps { display: flex; flex-direction: column; gap: 10px; }
+.install-step { display: flex; gap: 10px; align-items: flex-start; }
+.install-step-num { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--surface2); color: var(--accent); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.install-step-text { font-size: 13px; color: var(--text); line-height: 1.4; }
 .io-btn { display: flex; align-items: center; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
 .settings-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
 .settings-toggle-row:last-child { border-bottom: none; }
@@ -339,6 +346,17 @@ input[type=file] { display: none; }
   </div>
 </div>
 
+<div class="modal-backdrop" id="installModal" onclick="handleInstallBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">App installieren</div>
+      <button class="modal-close" onclick="closeInstallModal()">✕</button>
+    </div>
+    <div class="install-tabs" id="installTabs"></div>
+    <div class="modal-body" id="installModalBody" style="padding-top:4px"></div>
+  </div>
+</div>
+
 <!-- KÜNSTLER VIEW -->
 <div id="view-kuenstler" class="view" style="display:flex;flex-direction:column">
   <div class="toolbar">
@@ -465,6 +483,16 @@ input[type=file] { display: none; }
           Wählt aus, welche Locations in der Programm-Übersicht auftauchen sollen. Betrifft nicht die Künstler-Übersicht.
         </div>
         <button class="prog-quick-btn" onclick="openLocManageModal()" style="width:100%">📍 Locations verwalten</button>
+      </div>
+    </div>
+
+    <div class="io-section">
+      <div class="io-section-title">📲 App installieren</div>
+      <div style="padding:14px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
+          Als eigene App auf dem Startbildschirm installieren - läuft dann wie eine normale App, auch offline nutzbar. Die Schritte unterscheiden sich je nach Browser.
+        </div>
+        <button class="prog-quick-btn" onclick="openInstallModal()" style="width:100%">📲 Anleitung anzeigen</button>
       </div>
     </div>
 
@@ -1851,6 +1879,83 @@ function closeLocManageModal() {
 }
 function handleLocManageBackdropClick(e) {
   if (e.target.id === 'locManageModal') closeLocManageModal();
+}
+
+// ── APP INSTALLIEREN (Settings) ──────────────────────────────────────────────
+// Kurzanleitung, wie man die PWA auf dem Startbildschirm installiert - je
+// nach Browser völlig unterschiedliche Schritte, daher als Tabs statt als
+// eine lange Textwand: es wird immer nur die Anleitung für den gerade
+// gewählten Browser angezeigt, nicht alle gleichzeitig.
+const INSTALL_GUIDES = {
+  android: {
+    label: 'Chrome (Android)',
+    steps: [
+      'Menü (⋮) oben rechts antippen',
+      '„App installieren" bzw. „Zum Startbildschirm hinzufügen" wählen',
+      'Installation bestätigen'
+    ]
+  },
+  samsung: {
+    label: 'Samsung Internet',
+    steps: [
+      'Menü antippen (☰, meist unten in der Leiste)',
+      '„Seite hinzufügen zu" wählen',
+      '„Startbildschirm" auswählen und bestätigen'
+    ]
+  },
+  ios: {
+    label: 'Safari (iPhone/iPad)',
+    steps: [
+      'Teilen-Symbol (Quadrat mit Pfeil nach oben) unten in der Leiste antippen',
+      'Nach unten scrollen und „Zum Home-Bildschirm" wählen',
+      '„Hinzufügen" oben rechts bestätigen'
+    ]
+  },
+  desktop: {
+    label: 'Desktop (Chrome/Edge)',
+    steps: [
+      'Install-Symbol in der Adressleiste anklicken (⊕ bzw. kleines Bildschirm-Icon) - falls nicht sichtbar: Menü (⋮) → „App installieren"',
+      'Installation im Dialog bestätigen'
+    ]
+  }
+};
+let currentInstallTab = 'android';
+function renderInstallGuide() {
+  const tabsEl = document.getElementById('installTabs');
+  const bodyEl = document.getElementById('installModalBody');
+  if (!tabsEl || !bodyEl) return;
+  tabsEl.innerHTML = Object.keys(INSTALL_GUIDES).map(key =>
+    `<button type="button" class="install-tab${key === currentInstallTab ? ' active' : ''}" onclick="switchInstallTab('${key}')">${INSTALL_GUIDES[key].label}</button>`
+  ).join('');
+  const guide = INSTALL_GUIDES[currentInstallTab];
+  bodyEl.innerHTML = `<div class="install-steps">${guide.steps.map((s, i) =>
+    `<div class="install-step"><div class="install-step-num">${i + 1}</div><div class="install-step-text">${s}</div></div>`
+  ).join('')}</div>`;
+}
+function switchInstallTab(key) {
+  currentInstallTab = key;
+  renderInstallGuide();
+}
+// Grobe Einschätzung, welcher Browser gerade läuft, um beim Öffnen direkt den
+// passenden Tab vorauszuwählen - reine Komfortfunktion, alle Tabs bleiben
+// jederzeit manuell erreichbar, falls die Erkennung mal danebenliegt.
+function guessInstallPlatform() {
+  const ua = navigator.userAgent || '';
+  if (/SamsungBrowser/i.test(ua)) return 'samsung';
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  return 'desktop';
+}
+function openInstallModal() {
+  currentInstallTab = guessInstallPlatform();
+  renderInstallGuide();
+  document.getElementById('installModal').classList.add('open');
+}
+function closeInstallModal() {
+  document.getElementById('installModal').classList.remove('open');
+}
+function handleInstallBackdropClick(e) {
+  if (e.target.id === 'installModal') closeInstallModal();
 }
 
 // Merkt sich, welche rids (Zeilen-Ids) in der aktuell gerenderten Programm-
