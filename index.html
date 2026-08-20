@@ -827,59 +827,92 @@ function updateTagFilters() {
       [...refNames].sort((a, b) => a.localeCompare(b, 'de')).map(n => `<option value="${n}"${n === curSoundRef ? ' selected' : ''}>${n}</option>`).join('');
   }
 }
+// ── MEHRFACHAUSWAHL-FILTER (Genre, Location) ────────────────────────────────
+// Gemeinsamer Baukasten für "Mehrfachauswahl per Modal + Chips"-Filter.
+// Genre- und Location-Filter bestanden bisher aus je sechs praktisch
+// wortgleichen Funktionen (nur Optionsliste/Auswahl-Set/DOM-Ids unterschieden
+// sich) - hier auf eine gemeinsame Implementierung zurückgeführt. Erzeugt für
+// eine Konfiguration die komplette render/toggle/removeChip/reset/
+// updateChips/open/close/handleBackdrop-Logik. Die global aufrufbaren
+// Funktionsnamen (aus den generierten onclick-Attributen heraus referenziert)
+// bleiben als dünne Wrapper bestehen, damit sich am Verhalten nichts ändert.
+function makeMultiSelectFilter(opts) {
+  const { getOptions, selected, modalListId, modalId, chipsId, btnId, emptyLabel, allLabel, countLabel, toggleFnName, removeChipFnName, resetFnName, onChange } = opts;
+  function render() {
+    const el = document.getElementById(modalListId);
+    if (!el) return;
+    const options = getOptions();
+    if (!options.length) { el.innerHTML = `<div style="color:var(--text2);font-size:13px">${emptyLabel}</div>`; return; }
+    el.innerHTML = options.map(v => {
+      const checked = selected.has(v);
+      const vj = escJs(v);
+      return `<div class="genre-check-row${checked ? ' checked' : ''}" onclick="${toggleFnName}('${vj}')">
+        <div class="genre-check-box">${checked ? '✓' : ''}</div>
+        <div class="genre-check-label">${v}</div>
+      </div>`;
+    }).join('');
+  }
+  function toggle(v) {
+    if (selected.has(v)) selected.delete(v); else selected.add(v);
+    render();
+    updateChips();
+    onChange();
+  }
+  function removeChip(v) {
+    selected.delete(v);
+    updateChips();
+    render();
+    onChange();
+  }
+  function reset() {
+    selected.clear();
+    updateChips();
+    render();
+    onChange();
+  }
+  function updateChips() {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.textContent = selected.size ? countLabel(selected.size) : allLabel;
+    const wrap = document.getElementById(chipsId);
+    if (!wrap) return;
+    if (!selected.size) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+    wrap.style.display = 'flex';
+    const chips = [...selected].sort((a, b) => a.localeCompare(b, 'de'))
+      .map(v => `<span class="filter-chip">${v}<span class="filter-chip-x" onclick="${removeChipFnName}('${escJs(v)}')">✕</span></span>`).join('');
+    wrap.innerHTML = chips + (selected.size > 1 ? `<span class="filter-chip-reset" onclick="${resetFnName}()">Alle zurücksetzen</span>` : '');
+  }
+  function open() {
+    render();
+    document.getElementById(modalId).classList.add('open');
+  }
+  function close() {
+    document.getElementById(modalId).classList.remove('open');
+  }
+  function handleBackdrop(e) {
+    if (e.target.id === modalId) close();
+  }
+  return { render, toggle, removeChip, reset, updateChips, open, close, handleBackdrop };
+}
+
 // ── GENRE-MEHRFACHFILTER ────────────────────────────────────────────────────
-function openGenreModal() {
-  renderGenreModalList();
-  document.getElementById('genreModal').classList.add('open');
-}
-function closeGenreModal() {
-  document.getElementById('genreModal').classList.remove('open');
-}
-function handleGenreBackdropClick(e) {
-  if (e.target.id === 'genreModal') closeGenreModal();
-}
-function renderGenreModalList() {
-  const el = document.getElementById('genreModalList');
-  if (!el) return;
-  if (!allGenreTags.length) { el.innerHTML = '<div style="color:var(--text2);font-size:13px">Keine Genres vorhanden.</div>'; return; }
-  el.innerHTML = allGenreTags.map(g => {
-    const checked = selectedGenres.has(g);
-    const gj = escJs(g);
-    return `<div class="genre-check-row${checked ? ' checked' : ''}" onclick="toggleGenreSelection('${gj}')">
-      <div class="genre-check-box">${checked ? '✓' : ''}</div>
-      <div class="genre-check-label">${g}</div>
-    </div>`;
-  }).join('');
-}
-function toggleGenreSelection(g) {
-  if (selectedGenres.has(g)) selectedGenres.delete(g); else selectedGenres.add(g);
-  renderGenreModalList();
-  updateGenreChips();
-  render();
-}
-function removeGenreChip(g) {
-  selectedGenres.delete(g);
-  updateGenreChips();
-  renderGenreModalList();
-  render();
-}
-function resetGenreFilter() {
-  selectedGenres.clear();
-  updateGenreChips();
-  renderGenreModalList();
-  render();
-}
-function updateGenreChips() {
-  const btn = document.getElementById('fGenreBtn');
-  if (btn) btn.textContent = selectedGenres.size ? `🎵 Genre (${selectedGenres.size})` : '🎵 Alle Genres';
-  const wrap = document.getElementById('genreChips');
-  if (!wrap) return;
-  if (!selectedGenres.size) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
-  wrap.style.display = 'flex';
-  const chips = [...selectedGenres].sort((a, b) => a.localeCompare(b, 'de'))
-    .map(g => `<span class="filter-chip">${g}<span class="filter-chip-x" onclick="removeGenreChip('${escJs(g)}')">✕</span></span>`).join('');
-  wrap.innerHTML = chips + (selectedGenres.size > 1 ? `<span class="filter-chip-reset" onclick="resetGenreFilter()">Alle zurücksetzen</span>` : '');
-}
+const genreModalApi = makeMultiSelectFilter({
+  getOptions: () => allGenreTags,
+  selected: selectedGenres,
+  modalListId: 'genreModalList', modalId: 'genreModal', chipsId: 'genreChips', btnId: 'fGenreBtn',
+  emptyLabel: 'Keine Genres vorhanden.',
+  allLabel: '🎵 Alle Genres',
+  countLabel: n => `🎵 Genre (${n})`,
+  toggleFnName: 'toggleGenreSelection', removeChipFnName: 'removeGenreChip', resetFnName: 'resetGenreFilter',
+  onChange: () => render()
+});
+function openGenreModal() { genreModalApi.open(); }
+function closeGenreModal() { genreModalApi.close(); }
+function handleGenreBackdropClick(e) { genreModalApi.handleBackdrop(e); }
+function renderGenreModalList() { genreModalApi.render(); }
+function toggleGenreSelection(g) { genreModalApi.toggle(g); }
+function removeGenreChip(g) { genreModalApi.removeChip(g); }
+function resetGenreFilter() { genreModalApi.reset(); }
+function updateGenreChips() { genreModalApi.updateChips(); }
 
 function getSorted(arr) {
   return [...arr].sort((a, b) => {
@@ -1750,58 +1783,25 @@ function updateLocFilter() {
   renderLocModalList();
   updateLocChips();
 }
-function renderLocModalList() {
-  const el = document.getElementById('locModalList');
-  if (!el) return;
-  if (!locFilterOptions.length) { el.innerHTML = '<div style="color:var(--text2);font-size:13px">Keine Locations vorhanden.</div>'; return; }
-  el.innerHTML = locFilterOptions.map(l => {
-    const checked = selectedLocs.has(l);
-    const lj = escJs(l);
-    return `<div class="genre-check-row${checked ? ' checked' : ''}" onclick="toggleLocSelection('${lj}')">
-      <div class="genre-check-box">${checked ? '✓' : ''}</div>
-      <div class="genre-check-label">${l}</div>
-    </div>`;
-  }).join('');
-}
-function toggleLocSelection(l) {
-  if (selectedLocs.has(l)) selectedLocs.delete(l); else selectedLocs.add(l);
-  renderLocModalList();
-  updateLocChips();
-  renderProg();
-}
-function removeLocChip(l) {
-  selectedLocs.delete(l);
-  updateLocChips();
-  renderLocModalList();
-  renderProg();
-}
-function resetLocFilter() {
-  selectedLocs.clear();
-  updateLocChips();
-  renderLocModalList();
-  renderProg();
-}
-function updateLocChips() {
-  const btn = document.getElementById('locFilterBtn');
-  if (btn) btn.textContent = selectedLocs.size ? `📍 Location (${selectedLocs.size})` : '📍 Alle Locations';
-  const wrap = document.getElementById('locChips');
-  if (!wrap) return;
-  if (!selectedLocs.size) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
-  wrap.style.display = 'flex';
-  const chips = [...selectedLocs].sort((a, b) => a.localeCompare(b, 'de'))
-    .map(l => `<span class="filter-chip">${l}<span class="filter-chip-x" onclick="removeLocChip('${escJs(l)}')">✕</span></span>`).join('');
-  wrap.innerHTML = chips + (selectedLocs.size > 1 ? `<span class="filter-chip-reset" onclick="resetLocFilter()">Alle zurücksetzen</span>` : '');
-}
-function openLocModal() {
-  renderLocModalList();
-  document.getElementById('locModal').classList.add('open');
-}
-function closeLocModal() {
-  document.getElementById('locModal').classList.remove('open');
-}
-function handleLocBackdropClick(e) {
-  if (e.target.id === 'locModal') closeLocModal();
-}
+// ── LOCATION-MEHRFACHFILTER ──────────────────────────────────────────────────
+const locModalApi = makeMultiSelectFilter({
+  getOptions: () => locFilterOptions,
+  selected: selectedLocs,
+  modalListId: 'locModalList', modalId: 'locModal', chipsId: 'locChips', btnId: 'locFilterBtn',
+  emptyLabel: 'Keine Locations vorhanden.',
+  allLabel: '📍 Alle Locations',
+  countLabel: n => `📍 Location (${n})`,
+  toggleFnName: 'toggleLocSelection', removeChipFnName: 'removeLocChip', resetFnName: 'resetLocFilter',
+  onChange: () => renderProg()
+});
+function renderLocModalList() { locModalApi.render(); }
+function toggleLocSelection(l) { locModalApi.toggle(l); }
+function removeLocChip(l) { locModalApi.removeChip(l); }
+function resetLocFilter() { locModalApi.reset(); }
+function updateLocChips() { locModalApi.updateChips(); }
+function openLocModal() { locModalApi.open(); }
+function closeLocModal() { locModalApi.close(); }
+function handleLocBackdropClick(e) { locModalApi.handleBackdrop(e); }
 
 // ── LOCATIONS VERWALTEN (Settings) ─────────────────────────────────────────────
 // Persistente, geräteweite Anzeige-Einstellung: welche Locations sollen in der
