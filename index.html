@@ -703,6 +703,80 @@ function loadFromStorage() {
   } catch(e) { safeLog('Load error', e); }
 }
 
+// ── FILTER-PERSISTENZ ─────────────────────────────────────────────────────────
+// Speichert alle Filter-Einstellungen (Künstler- UND Programm-Übersicht) unter
+// einem eigenen, kleinen localStorage-Key - bewusst getrennt vom Haupt-Payload
+// (Bewertungen/Kommentare/Auftrittsdaten), damit jede Filteränderung (auch bei
+// jedem Tastendruck in der Suche) nicht jedes Mal den kompletten, potenziell
+// großen Datenbestand neu schreiben muss. Wird zentral am Ende von render()
+// und renderProg() aufgerufen, deckt also automatisch jede Filteränderung ab,
+// ohne dass jede einzelne Filter-Bedienstelle das selbst anstoßen müsste.
+const LS_FILTERS_KEY = 'rbf2026_filters_v1';
+function saveFilterState() {
+  try {
+    const state = {
+      search: document.getElementById('search').value,
+      fGender: document.getElementById('fGender').value,
+      kuenstlerSeenFilter,
+      selectedGenres: [...selectedGenres],
+      fHerkunft: document.getElementById('fHerkunft').value,
+      fSoundRef: document.getElementById('fSoundRef').value,
+      fHidden: document.getElementById('fHidden').value,
+      kuenstlerAvgFilter,
+      statsBewertetFilter,
+      statsUnbewertetFilter,
+      statsReinhoerenFilter,
+      activeDays: [...document.querySelectorAll('.day-btn')].filter(b => b.classList.contains('active')).map(b => b.dataset.day),
+      timeFrom: document.getElementById('timeFrom').value,
+      timeTo: document.getElementById('timeTo').value,
+      selectedLocs: [...selectedLocs],
+      progRatingFilter,
+      progShowRatingFilter,
+      fProgStatus: document.getElementById('fProgStatus').value,
+      fProgDuration: document.getElementById('fProgDuration').checked,
+      progShowHidden: document.getElementById('progShowHidden').checked
+    };
+    localStorage.setItem(LS_FILTERS_KEY, JSON.stringify(state));
+  } catch (e) { safeLog('Filter-Speichern fehlgeschlagen:', e); }
+}
+// Stellt alle gespeicherten Filter-Einstellungen wieder her. Wird einmalig
+// beim App-Start aufgerufen, NACH updateTagFilters()/buildTimeDropdowns()
+// (damit die betroffenen <select>-Optionen/Tag-Buttons schon existieren) und
+// VOR dem ersten render(). Setzt smartProgDefaultsApplied, damit der
+// "automatisch auf 'jetzt' springen"-Mechanismus einen wiederhergestellten
+// Zustand nicht sofort wieder überschreibt.
+function loadFilterState() {
+  try {
+    const raw = localStorage.getItem(LS_FILTERS_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (typeof s.search === 'string') document.getElementById('search').value = s.search;
+    document.getElementById('searchClear').style.display = document.getElementById('search').value ? 'flex' : 'none';
+    if (typeof s.fGender === 'string') document.getElementById('fGender').value = s.fGender;
+    if (typeof s.kuenstlerSeenFilter === 'string') kuenstlerSeenFilter = s.kuenstlerSeenFilter;
+    if (Array.isArray(s.selectedGenres)) s.selectedGenres.forEach(g => selectedGenres.add(g));
+    if (typeof s.fHerkunft === 'string') document.getElementById('fHerkunft').value = s.fHerkunft;
+    if (typeof s.fSoundRef === 'string') document.getElementById('fSoundRef').value = s.fSoundRef;
+    if (typeof s.fHidden === 'string') document.getElementById('fHidden').value = s.fHidden;
+    if (typeof s.kuenstlerAvgFilter === 'number') kuenstlerAvgFilter = s.kuenstlerAvgFilter;
+    if (typeof s.statsBewertetFilter === 'boolean') statsBewertetFilter = s.statsBewertetFilter;
+    if (typeof s.statsUnbewertetFilter === 'boolean') statsUnbewertetFilter = s.statsUnbewertetFilter;
+    if (typeof s.statsReinhoerenFilter === 'boolean') statsReinhoerenFilter = s.statsReinhoerenFilter;
+    if (Array.isArray(s.activeDays)) {
+      document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', s.activeDays.includes(b.dataset.day)));
+    }
+    if (typeof s.timeFrom === 'string') document.getElementById('timeFrom').value = s.timeFrom;
+    if (typeof s.timeTo === 'string') document.getElementById('timeTo').value = s.timeTo;
+    if (Array.isArray(s.selectedLocs)) s.selectedLocs.forEach(l => selectedLocs.add(l));
+    if (typeof s.progRatingFilter === 'number') progRatingFilter = s.progRatingFilter;
+    if (typeof s.progShowRatingFilter === 'number') progShowRatingFilter = s.progShowRatingFilter;
+    if (typeof s.fProgStatus === 'string') document.getElementById('fProgStatus').value = s.fProgStatus;
+    if (typeof s.fProgDuration === 'boolean') document.getElementById('fProgDuration').checked = s.fProgDuration;
+    if (typeof s.progShowHidden === 'boolean') document.getElementById('progShowHidden').checked = s.progShowHidden;
+    smartProgDefaultsApplied = true;
+  } catch (e) { safeLog('Filter-Laden fehlgeschlagen:', e); }
+}
+
 // ── PWA REGISTRATION ─────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(e => safeLog('SW:', e));
@@ -1461,11 +1535,13 @@ function render() {
   if (!rows.length) {
     list.innerHTML = '<div class="no-results">Keine Ergebnisse.</div>';
     updateStats();
+    saveFilterState();
     return;
   }
   list.innerHTML = rows.map(d => `<div class="artist-item" id="item-${d.name}"></div>`).join('');
   rows.forEach(d => renderArtistItem(d.name));
   updateStats();
+  saveFilterState();
 }
 
 // Prüft, ob in der Künstler-Übersicht aktuell irgendein Filter von seinem
@@ -1973,12 +2049,13 @@ function renderProg() {
   if (!auftritte.length) {
     list.innerHTML = `<div class="prog-empty"><div class="icon">📅</div>Noch keine Auftrittsdaten hinterlegt.</div>`;
     updateProgTotalTime();
+    saveFilterState();
     return;
   }
   let filtered = getFilteredAuftritte();
   filtered.sort((a,b) => dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.time) - timeSortValue(b.time) || a.name.localeCompare(b.name));
   updateProgTotalTime();
-  if (!filtered.length) { list.innerHTML = `<div class="prog-empty">Keine Auftritte für diese Filter.</div>`; return; }
+  if (!filtered.length) { list.innerHTML = `<div class="prog-empty">Keine Auftritte für diese Filter.</div>`; saveFilterState(); return; }
   let html = '', lastDay = '';
   filtered.forEach((a, i) => {
     if (a.day !== lastDay) { html += `<div class="prog-day-header">${a.day}</div>`; lastDay = a.day; }
@@ -2029,6 +2106,7 @@ function renderProg() {
     </div>`;
   });
   list.innerHTML = html;
+  saveFilterState();
 }
 
 function resetAuftritteToDefault() {
@@ -2075,6 +2153,9 @@ applySettingsUI();
 updateLocFilter();
 updateTagFilters();
 buildTimeDropdowns();
+loadFilterState();
+updateGenreChips();
+updateLocFilter();
 renderProgRatingStars();
 renderProgShowRatingStars();
 renderKuenstlerAvgFilterStars();
