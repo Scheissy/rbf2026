@@ -187,6 +187,10 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .prog-rating-summary { display: flex; align-items: center; gap: 5px; margin-top: 4px; }
 .prog-avg-val { font-size: 10px; color: var(--text2); }
 .prog-rating-arrow { font-size: 11px; color: var(--text3); flex-shrink: 0; padding-top: 2px; }
+.prog-right-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+.plan-flag-btn { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; border: none; background: transparent; font-size: 14px; cursor: pointer; padding: 0; flex-shrink: 0; color: var(--text3); opacity: 0.45; filter: grayscale(1); }
+.plan-flag-btn.active { color: var(--accent); opacity: 1; filter: none; }
+.plan-flag-btn:active { background: var(--surface2); }
 .prog-detail { padding: 2px 12px 12px 66px; border-bottom: 1px solid var(--border); background: var(--surface2); }
 .prog-detail.collapsed { display: none; }
 .prog-detail-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; color: var(--text2); }
@@ -443,6 +447,10 @@ input[type=file] { display: none; }
       <input type="checkbox" id="fProgDuration" onchange="renderProg()">
       ⏱ Nur mit eingetragener Dauer
     </label>
+    <label class="prog-hidden-toggle">
+      <input type="checkbox" id="fProgPlanned" onchange="renderProg()">
+      🎯 Nur als Ziel markierte
+    </label>
   </div>
   <div class="prog-total-time" id="progTotalTime" style="display:none"></div>
   <div class="prog-list" id="progList"></div>
@@ -631,6 +639,11 @@ let showRatings = {};
 // Show (showKey) gespeichert, nicht pro Künstler. Fehlt ein Key, wurde für
 // diesen Auftritt keine Dauer eingetragen ("keine Angabe" != "0 Minuten").
 let showDurations = {};
+// Plan-Flag: markiert einzelne Auftritte (nicht Künstler!) als "das will ich
+// mir vornehmen/einplanen" - unabhängig von Bewertung/Dauer/Gesehen-Status.
+// Wie showRatings/showDurations pro konkreter Show (showKey) gespeichert.
+// Fehlender Key = nicht markiert.
+let planFlags = {};
 let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
 let kuenstlerAvgFilter = 0; // Mindest-Durchschnittsbewertung im Künstlerübersicht-Filter (0 = alle)
 let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
@@ -663,7 +676,7 @@ function saveToStorage() {
       .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet || d.kommentar || d.reinhoeren)
       .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false, c: d.kommentar||'', rh: d.reinhoeren||false }));
     const auftrittePayload = auftritte.length ? auftritte : [];
-    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, auftritteVersion: DATA_VERSION, showRatings, showDurations, settings: appSettings }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, auftritteVersion: DATA_VERSION, showRatings, showDurations, planFlags, settings: appSettings }));
     document.getElementById('saveIndicator').textContent = '✓ gespeichert';
     setTimeout(() => document.getElementById('saveIndicator').textContent = '', 2000);
   } catch(e) { safeLog('Storage error', e); }
@@ -706,6 +719,7 @@ function loadFromStorage() {
     }
     if (data.showRatings) showRatings = data.showRatings;
     if (data.showDurations) showDurations = data.showDurations;
+    if (data.planFlags) planFlags = data.planFlags;
     if (data.settings) appSettings = { ...appSettings, ...data.settings };
   } catch(e) { safeLog('Load error', e); }
 }
@@ -742,6 +756,7 @@ function saveFilterState() {
       progShowRatingFilter,
       fProgStatus: document.getElementById('fProgStatus').value,
       fProgDuration: document.getElementById('fProgDuration').checked,
+      fProgPlanned: document.getElementById('fProgPlanned').checked,
       progShowHidden: document.getElementById('progShowHidden').checked
     };
     localStorage.setItem(LS_FILTERS_KEY, JSON.stringify(state));
@@ -781,6 +796,7 @@ function loadFilterState() {
     if (typeof s.progShowRatingFilter === 'number') progShowRatingFilter = s.progShowRatingFilter;
     if (typeof s.fProgStatus === 'string') document.getElementById('fProgStatus').value = s.fProgStatus;
     if (typeof s.fProgDuration === 'boolean') document.getElementById('fProgDuration').checked = s.fProgDuration;
+    if (typeof s.fProgPlanned === 'boolean') document.getElementById('fProgPlanned').checked = s.fProgPlanned;
     if (typeof s.progShowHidden === 'boolean') document.getElementById('progShowHidden').checked = s.progShowHidden;
     smartProgDefaultsApplied = true;
   } catch (e) { safeLog('Filter-Laden fehlgeschlagen:', e); }
@@ -1147,6 +1163,28 @@ function setShowRating(rid, skey, n) {
 
 // ── AUFTRITTS-DAUER ─────────────────────────────────────────────────────────
 // Formatiert Minuten als "45 Min" / "1h" / "1h 15min" für Anzeige & Dropdown.
+// ── PLAN-FLAG ─────────────────────────────────────────────────────────────────
+// Markiert einzelne Auftritte als "eingeplant" - direkt aus der eingeklappten
+// Zeile heraus umschaltbar (kein Aufklappen nötig), daher immer sichtbar
+// (anders als z.B. das Kommentar-Icon, das nur bei vorhandenem Inhalt
+// erscheint). Grau/gedimmt = nicht markiert, volle Farbe = markiert.
+function planFlagHTML(rid, skey) {
+  const flagged = !!planFlags[skey];
+  return `<button type="button" class="plan-flag-btn${flagged ? ' active' : ''}" id="${rid}-planflag" onclick="event.stopPropagation();togglePlanFlag('${rid}','${escJs(skey)}')" title="${flagged ? 'Als Ziel markiert' : 'Als Ziel markieren'}">🎯</button>`;
+}
+function togglePlanFlag(rid, skey) {
+  const wasFlagged = !!planFlags[skey];
+  if (wasFlagged) delete planFlags[skey];
+  else planFlags[skey] = true;
+  saveToStorage();
+  // Wird das Flag entfernt, während der "Nur als Ziel markierte"-Filter aktiv
+  // ist, muss die Zeile aus der Liste verschwinden -> volle Neu-Filterung
+  // nötig (gleiches Muster wie beim Dauer-Filter).
+  if (document.getElementById('fProgPlanned').checked && wasFlagged) { renderProg(); return; }
+  const el = document.getElementById(`${rid}-planflag`);
+  if (el) el.outerHTML = planFlagHTML(rid, skey);
+}
+
 function formatDuration(min) {
   if (min === 0) return '0 Min';
   const h = Math.floor(min / 60), m = min % 60;
@@ -1190,6 +1228,7 @@ function getFilteredAuftritte() {
   const minRating = progRatingFilter;
   const statusVal = document.getElementById('fProgStatus').value;
   const durationOnly = document.getElementById('fProgDuration').checked;
+  const plannedOnly = document.getElementById('fProgPlanned').checked;
   return auftritte.filter(a => {
     if (!days.includes(a.day)) return false;
     // Persistente Locations-Verwaltung (Settings): komplett ausgeblendete
@@ -1210,6 +1249,7 @@ function getFilteredAuftritte() {
     if (statusVal === 'bekannt' && d?.gesehen !== 'bekannt' && d?.gesehen !== 'ja') return false; // "gesehen" ist immer auch "bekannt"
     if (statusVal === 'unbekannt' && (!d || d.gesehen !== '')) return false;
     if (durationOnly && showDurations[showKey(a)] === undefined) return false;
+    if (plannedOnly && !planFlags[showKey(a)]) return false;
     return true;
   });
 }
@@ -1836,6 +1876,7 @@ function resetProgFilters() {
   selectedLocs.clear();
   document.getElementById('fProgStatus').value = '';
   document.getElementById('fProgDuration').checked = false;
+  document.getElementById('fProgPlanned').checked = false;
   progRatingFilter = 0;
   renderProgRatingStars();
   progShowRatingFilter = 0;
@@ -1860,6 +1901,7 @@ function jumpToNow() {
   selectedLocs.clear();
   document.getElementById('fProgStatus').value = '';
   document.getElementById('fProgDuration').checked = false;
+  document.getElementById('fProgPlanned').checked = false;
   progRatingFilter = 0;
   renderProgRatingStars();
   progShowRatingFilter = 0;
@@ -2102,7 +2144,10 @@ function renderProg() {
           <div class="prog-duration-summary" id="${rid}-durationsummary" style="${duration !== undefined ? '' : 'display:none'}">${duration !== undefined ? `⏱ ${formatDuration(duration)}` : ''}</div>
         </div>
       </div>
-      <div class="prog-rating-arrow" id="${rid}-arrow">▸</div>
+      <div class="prog-right-col">
+        ${planFlagHTML(rid, skey)}
+        <div class="prog-rating-arrow" id="${rid}-arrow">▸</div>
+      </div>
     </div>
     <div class="prog-detail collapsed" id="${rid}-detail">
       ${d ? `<div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
