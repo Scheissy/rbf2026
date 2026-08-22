@@ -474,6 +474,13 @@ input[type=file] { display: none; }
         </div>
         <input type="checkbox" id="settingShowSoundRef" checked onchange="toggleSetting('showSoundRef', this.checked)">
       </label>
+      <label class="settings-toggle-row">
+        <div class="settings-toggle-text">
+          <div class="settings-toggle-label">💾 Filter-Persistenz</div>
+          <div class="settings-toggle-desc">Filter-Einstellungen (Künstler- & Programm-Übersicht) über Neustarts hinweg merken</div>
+        </div>
+        <input type="checkbox" id="settingPersistFilters" checked onchange="toggleSetting('persistFilters', this.checked)">
+      </label>
     </div>
 
     <div class="io-section">
@@ -635,7 +642,7 @@ let statsReinhoerenFilter = false; // "Nur zum Reinhören markierte Künstler" -
 // lebt jetzt rein hier, gesetzt/zurückgesetzt über filterByStat().
 let kuenstlerSeenFilter = '';
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
-let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [] };
+let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
 let selectedLocs = new Set(); // Mehrfachauswahl im Location-Filter der Programm-Übersicht (leer = alle)
 let locFilterOptions = []; // aktuell (nach Tag/Uhrzeit) verfügbare Locations fürs Modal
@@ -713,6 +720,7 @@ function loadFromStorage() {
 // ohne dass jede einzelne Filter-Bedienstelle das selbst anstoßen müsste.
 const LS_FILTERS_KEY = 'rbf2026_filters_v1';
 function saveFilterState() {
+  if (!appSettings.persistFilters) return;
   try {
     const state = {
       search: document.getElementById('search').value,
@@ -746,6 +754,7 @@ function saveFilterState() {
 // "automatisch auf 'jetzt' springen"-Mechanismus einen wiederhergestellten
 // Zustand nicht sofort wieder überschreibt.
 function loadFilterState() {
+  if (!appSettings.persistFilters) return;
   try {
     const raw = localStorage.getItem(LS_FILTERS_KEY);
     if (!raw) return;
@@ -1667,6 +1676,12 @@ function toggleSetting(key, val) {
       if (sel) sel.value = '';
     }
   }
+  if (key === 'persistFilters' && !val) {
+    // Beim Ausschalten den bereits gespeicherten Filter-Zustand aktiv
+    // löschen - sonst könnte ein späteres erneutes Einschalten einen alten,
+    // inzwischen veralteten Stand wiederherstellen.
+    try { localStorage.removeItem(LS_FILTERS_KEY); } catch (e) { safeLog('Konnte Filter-Persistenz nicht löschen:', e); }
+  }
   saveToStorage();
   render();
   if (currentTab === 'programm') renderProg();
@@ -1676,6 +1691,7 @@ function applySettingsUI() {
   document.getElementById('settingShowMapsLinks').checked = appSettings.showMapsLinks;
   document.getElementById('settingShowListening').checked = appSettings.showListening;
   document.getElementById('settingShowSoundRef').checked = appSettings.showSoundRef;
+  document.getElementById('settingPersistFilters').checked = appSettings.persistFilters;
   updateSoundRefFilterVisibility();
 }
 
