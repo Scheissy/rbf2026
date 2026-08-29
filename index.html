@@ -446,6 +446,14 @@ input[type=file] { display: none; }
       <input type="checkbox" id="fProgPlanned" onchange="renderProg()">
       🎯 Nur als Ziel markierte
     </label>
+    <label class="prog-hidden-toggle">
+      <input type="checkbox" id="settingShowMusicEvents" checked onchange="toggleSetting('showMusicEvents', this.checked)">
+      🎵 Musik-Events anzeigen
+    </label>
+    <label class="prog-hidden-toggle">
+      <input type="checkbox" id="settingShowOtherEvents" checked onchange="toggleSetting('showOtherEvents', this.checked)">
+      🎪 Sonstige Events anzeigen
+    </label>
   </div>
   <div class="prog-total-time" id="progTotalTime" style="display:none"></div>
   <div class="prog-list" id="progList"></div>
@@ -639,6 +647,42 @@ let showDurations = {};
 // Wie showRatings/showDurations pro konkreter Show (showKey) gespeichert.
 // Fehlender Key = nicht markiert.
 let planFlags = {};
+
+// ── RBF_EVENTS (Sonderveranstaltungen) ──────────────────────────────────────
+// RBF_EVENTS kommt aus rbf-data.js: Veranstaltungen ohne einzelnen Künstler-
+// Auftritt im klassischen Sinn (Award-Shows, Eröffnungsfeier, Podcasts etc.),
+// die deshalb NICHT in RAW_AUFTRITTE stehen. Werden hier in ein zu
+// RAW_AUFTRITTE-Einträgen kompatibles Format gebracht (inkl. synthetischer
+// "nid", damit showKey()/Bewertung/Dauer/Plan-Flag ohne Sonderfall
+// funktionieren) und NUR in der Programm-Übersicht mit angezeigt - die
+// Künstler-Übersicht bleibt davon komplett unberührt, da "auftritte" selbst
+// nicht verändert wird.
+let rbfEvents = [];
+function buildRbfEvents() {
+  if (typeof RBF_EVENTS === 'undefined' || !Array.isArray(RBF_EVENTS)) { rbfEvents = []; return; }
+  rbfEvents = RBF_EVENTS.map((e, i) => ({
+    name: e.name,
+    day: e.day,
+    time: e.time || '',
+    endTime: e.endTime || '',
+    location: e.location || '',
+    acts: Array.isArray(e.acts) ? e.acts : [],
+    kategorie: e.kategorie === 'Musik' ? 'Musik' : 'Sonstiges',
+    nid: `evt-${i}`,
+    isEvent: true
+  }));
+}
+// Gemeinsame Basis für alles, was in der Programm-Übersicht auftauchen soll -
+// reguläre Auftritte UND Sonderveranstaltungen zusammen. Wird von der
+// Filterlogik, der Location-Verwaltung und dem Location-Filter genutzt, damit
+// Events dort konsistent mit einbezogen werden.
+function allProgEntries() {
+  const visibleEvents = rbfEvents.filter(e =>
+    (e.kategorie !== 'Musik' || appSettings.showMusicEvents) &&
+    (e.kategorie !== 'Sonstiges' || appSettings.showOtherEvents)
+  );
+  return auftritte.concat(visibleEvents);
+}
 let progShowRatingFilter = 0; // Mindest-Auftrittsbewertung im Programm-Filter (0 = alle)
 let kuenstlerAvgFilter = 0; // Mindest-Durchschnittsbewertung im Künstlerübersicht-Filter (0 = alle)
 let statsBewertetFilter = false; // "Nur bewertete Künstler" - über Klick auf Stat-Zeile "Bewertet"
@@ -657,7 +701,7 @@ let statsAusgeblendetFilter = false;
 // lebt jetzt rein hier, gesetzt/zurückgesetzt über filterByStat().
 let kuenstlerSeenFilter = '';
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
-let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true };
+let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true, showMusicEvents: true, showOtherEvents: true };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
 let selectedLocs = new Set(); // Mehrfachauswahl im Location-Filter der Programm-Übersicht (leer = alle)
 let locFilterOptions = []; // aktuell (nach Tag/Uhrzeit) verfügbare Locations fürs Modal
@@ -1229,7 +1273,7 @@ function getFilteredAuftritte() {
   const statusVal = document.getElementById('fProgStatus').value;
   const durationOnly = document.getElementById('fProgDuration').checked;
   const plannedOnly = document.getElementById('fProgPlanned').checked;
-  return auftritte.filter(a => {
+  return allProgEntries().filter(a => {
     if (!days.includes(a.day)) return false;
     // Persistente Locations-Verwaltung (Settings): komplett ausgeblendete
     // Locations gelten immer, unabhängig vom temporären Location-Filter oben
@@ -1260,7 +1304,7 @@ function getFilteredAuftritte() {
 function updateProgTotalTime() {
   const el = document.getElementById('progTotalTime');
   if (!el) return;
-  if (!auftritte.length) { el.style.display = 'none'; return; }
+  if (!allProgEntries().length) { el.style.display = 'none'; return; }
   const withDuration = getFilteredAuftritte().filter(a => showDurations[showKey(a)] !== undefined);
   if (!withDuration.length) { el.style.display = 'none'; el.textContent = ''; return; }
   const totalMin = withDuration.reduce((sum, a) => sum + showDurations[showKey(a)], 0);
@@ -1735,6 +1779,8 @@ function applySettingsUI() {
   document.getElementById('settingShowListening').checked = appSettings.showListening;
   document.getElementById('settingShowSoundRef').checked = appSettings.showSoundRef;
   document.getElementById('settingPersistFilters').checked = appSettings.persistFilters;
+  document.getElementById('settingShowMusicEvents').checked = appSettings.showMusicEvents;
+  document.getElementById('settingShowOtherEvents').checked = appSettings.showOtherEvents;
   updateSoundRefFilterVisibility();
 }
 
@@ -1933,7 +1979,7 @@ function updateLocFilter() {
   const days = activeDays();
   const fromVal = document.getElementById('timeFrom').value;
   const toVal = document.getElementById('timeTo').value;
-  const relevant = auftritte.filter(a => {
+  const relevant = allProgEntries().filter(a => {
     if (!days.includes(a.day)) return false;
     if (appSettings.hiddenLocations.includes(a.location)) return false;
     if (a.time) {
@@ -1977,7 +2023,7 @@ function handleLocBackdropClick(e) { locModalApi.handleBackdrop(e); }
 // Auftritts-Liste in der Detailansicht) zeigt immer alle Auftritte, unabhängig
 // von dieser Einstellung.
 function allLocationNames() {
-  return [...new Set(auftritte.map(a => a.location).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  return [...new Set(allProgEntries().map(a => a.location).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
 }
 function renderLocManageModalList() {
   const el = document.getElementById('locManageModalList');
@@ -2107,7 +2153,7 @@ function renderProg() {
   openProgRid = null;
   progRidsByName = {};
   updateLocFilter();
-  if (!auftritte.length) {
+  if (!allProgEntries().length) {
     list.innerHTML = `<div class="prog-empty"><div class="icon">📅</div>Noch keine Auftrittsdaten hinterlegt.</div>`;
     updateProgTotalTime();
     saveFilterState();
@@ -2135,8 +2181,8 @@ function renderProg() {
     html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
-        <div class="prog-name">${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(a.name, nj, d, rid)}${soundRefIconHTML(a.name)}</div>
-        <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : ''}</div>
+        <div class="prog-name">${a.isEvent ? (a.kategorie === 'Musik' ? '🎵 ' : '🎪 ') : ''}${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(a.name, nj, d, rid)}${soundRefIconHTML(a.name)}</div>
+        <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : (a.isEvent ? `Sonderveranstaltung · ${a.kategorie}` : '')}</div>
         <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${escJs(a.location)}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
           <span>${miniStars(avg)}</span>
@@ -2161,7 +2207,13 @@ function renderProg() {
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
         <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${escJs(d.customUrl || d.rbfUrl)}')">↗ RBF-Seite öffnen</a>
         <button type="button" class="prog-detail-link-btn" onclick="event.stopPropagation();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</button>
-      </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`}
+      </div>` : (a.isEvent ? `<div class="prog-detail-row">
+        <div class="detail-label">${a.kategorie === 'Musik' ? '🎵' : '🎪'} Sonderveranstaltung · ${a.kategorie}</div>
+        ${a.acts && a.acts.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${a.acts.map(n => {
+          const dd = dataMap[n];
+          return dd ? `<span class="badge ${genderBadgeClass(dd.geschlecht)}" style="font-size:10px">${n}</span>` : `<span class="badge" style="font-size:10px;background:var(--surface2);color:var(--text2)">${n}</span>`;
+        }).join('')}</div>` : ''}
+      </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`)}
       <div class="prog-detail-divider"></div>
       <div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
         <div class="prog-detail-pair"><span class="prog-detail-label">Auftritt</span><div class="stars stars-sm" id="${rid}-show">${progShowStarsHTML(rid,skey)}</div></div>
@@ -2213,6 +2265,7 @@ function exportKombiniertCSV() {
 
 loadFromStorage();
 autoFixAuftritte();
+buildRbfEvents();
 applySettingsUI();
 updateLocFilter();
 updateTagFilters();
