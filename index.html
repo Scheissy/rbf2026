@@ -668,6 +668,7 @@ function buildRbfEvents() {
     location: e.location || '',
     acts: Array.isArray(e.acts) ? e.acts : [],
     kategorie: e.kategorie === 'Musik' ? 'Musik' : 'Sonstiges',
+    url: e.url || '',
     nid: `evt-${i}`,
     isEvent: true
   }));
@@ -2213,6 +2214,7 @@ function renderProg() {
           const dd = dataMap[n];
           return dd ? `<span class="badge ${genderBadgeClass(dd.geschlecht)}" style="font-size:10px">${n}</span>` : `<span class="badge" style="font-size:10px;background:var(--surface2);color:var(--text2)">${n}</span>`;
         }).join('')}</div>` : ''}
+        ${a.url ? `<div style="margin-top:8px"><a class="prog-detail-link" style="margin-top:0" href="${a.url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${escJs(a.url)}')">↗ Veranstaltung öffnen</a></div>` : ''}
       </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`)}
       <div class="prog-detail-divider"></div>
       <div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
