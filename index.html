@@ -323,6 +323,7 @@ input[type=file] { display: none; }
       <p style="margin:0 0 10px">Springt auf den aktuellen Festivaltag und die aktuelle Uhrzeit.</p>
       <p style="margin:0 0 10px"><b>1. Tippen:</b> Nur Tag und Uhrzeit werden angepasst - alle anderen Filter (Location, Bewertungen, Status, Dauer, Ziel) bleiben unverändert.</p>
       <p style="margin:0">Steht man bereits auf der aktuellen Zeit, setzt ein <b>weiteres Tippen</b> zusätzlich diese übrigen Filter zurück. „Ausgeblendete anzeigen" sowie die Musik-/Sonstige-Events-Anzeige bleiben dabei immer unangetastet.</p>
+      <p style="margin:10px 0 0;padding-top:10px;border-top:1px solid var(--border);color:var(--text2);font-size:13px">Unterschied zu „Filter zurücksetzen": das springt immer auf den heutigen Tag (inkl. aller kommenden Tage) und setzt alle übrigen Filter sofort zurück - ohne Rücksicht auf die aktuelle Uhrzeit.</p>
     </div>
   </div>
 </div>
@@ -1812,7 +1813,10 @@ function buildTimeDropdowns() {
   slots.forEach(s => { if (!seen.has(s)) { seen.add(s); uniq.push(s); } });
   document.getElementById('timeFrom').innerHTML = uniq.map(s => `<option>${s}</option>`).join('');
   document.getElementById('timeTo').innerHTML = `<option value="">– Ende –</option>` + uniq.map(s => `<option>${s}</option>`).join('');
-  document.getElementById('timeFrom').value = '10:00';
+  // 08:00 = Beginn des Festival-Zeitfensters (siehe getFestivalContext()) und
+  // zugleich der erste Dropdown-Eintrag - einheitlicher "kein Zeitfilter"-
+  // Ausgangswert, identisch zu dem, den resetProgFilters() setzt.
+  document.getElementById('timeFrom').value = '08:00';
 }
 
 function toggleSetting(key, val) {
@@ -1966,17 +1970,30 @@ function getBerlinNow() {
   const get = t => parseInt(parts.find(p => p.type === t).value, 10);
   return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') === 24 ? 0 : get('hour'), minute: get('minute') };
 }
-function getFestivalContext() {
-  const FESTIVAL_DAYS = { '9-16': 'Mi 16.09', '9-17': 'Do 17.09', '9-18': 'Fr 18.09', '9-19': 'Sa 19.09' };
-  const now = getBerlinNow();
-  // Nach Mitternacht (vor 5 Uhr) zählt es gefühlt noch zum Vorabend/-tag
+// Zuordnung Kalenderdatum (Monat-Tag, Europe/Berlin) -> Festivaltag-Label.
+// Zentral definiert, damit sowohl getFestivalContext() (Zeitsprung) als auch
+// getPastFestivalDays() (Reset) dieselbe Quelle nutzen und nie auseinanderlaufen.
+const FESTIVAL_DAYS = { '9-16': 'Mi 16.09', '9-17': 'Do 17.09', '9-18': 'Fr 18.09', '9-19': 'Sa 19.09' };
+
+// Liefert das "gefühlte" Kalenderdatum für die Festivaltag-Zuordnung: nach
+// Mitternacht (vor 5 Uhr) zählt es noch zum Vorabend/-tag, weil die
+// Nacht-Programme der einzelnen Festivaltage bis in die frühen Morgenstunden
+// hineinlaufen (siehe RAW_AUFTRITTE: ein 00:10-Uhr-Auftritt trägt trotzdem
+// noch das Tages-Label des Vorabends, nicht des Kalendertags).
+function getEffectiveFestivalDate(now = getBerlinNow()) {
   let refMonth = now.month, refDay = now.day;
   if (now.hour < 5) {
     const prev = new Date(Date.UTC(now.year, now.month - 1, now.day - 1));
     refMonth = prev.getUTCMonth() + 1;
     refDay = prev.getUTCDate();
   }
-  const key = `${refMonth}-${refDay}`;
+  return { month: refMonth, day: refDay };
+}
+
+function getFestivalContext() {
+  const now = getBerlinNow();
+  const eff = getEffectiveFestivalDate(now);
+  const key = `${eff.month}-${eff.day}`;
   const day = FESTIVAL_DAYS[key];
   if (!day) return null;
 
@@ -1990,6 +2007,21 @@ function getFestivalContext() {
   return { day, time };
 }
 
+// Liefert die Menge der Festivaltage, die aus Sicht von "heute" (inkl.
+// Nachteulen-Puffer, siehe getEffectiveFestivalDate()) bereits komplett
+// vorbei sind. Nur relevant WÄHREND des Festivals: vor Festivalbeginn oder
+// nach Festivalende liefert diese Funktion bewusst eine leere Menge - in
+// beiden Fällen wäre "nur die kommenden Tage zeigen" nicht sinnvoll (vorher
+// ist alles zukünftig, nachher alles vergangen).
+function getPastFestivalDays() {
+  const eff = getEffectiveFestivalDate();
+  const todayLabel = FESTIVAL_DAYS[`${eff.month}-${eff.day}`];
+  if (!todayLabel) return new Set();
+  const todayIdx = DAY_ORDER.indexOf(todayLabel);
+  if (todayIdx <= 0) return new Set();
+  return new Set(DAY_ORDER.slice(0, todayIdx));
+}
+
 function applySmartProgDefaults() {
   const ctx = getFestivalContext();
   if (!ctx) return; // heute ist kein Festivaltag -> Filter unverändert lassen
@@ -2001,8 +2033,16 @@ function applySmartProgDefaults() {
 // Setzt alle Programm-Filter zurück (Tage, Zeit, Location, Bewertungen, Status) -
 // bewusst OHNE den "Ausgeblendete anzeigen"-Haken anzutasten, den will man i.d.R.
 // nicht bei jedem Reset wieder verlieren.
+// Tage: bewusst NICHT einfach "alle" aktivieren, sondern bereits vergangene
+// Festivaltage (siehe getPastFestivalDays()) deaktiviert lassen - wer am
+// Freitag zurücksetzt, will i.d.R. nicht wieder Mittwoch/Donnerstag sehen.
+// Das ist auch der bewusste Unterschied zu "Jetzt": "Zurücksetzen" springt
+// IMMER auf "heute" (ganzer Tag, alle künftigen Tage inklusive), "Jetzt"
+// springt beim 1. Klick nur auf die genaue Uhrzeit (ohne die übrigen Filter
+// anzutasten) und setzt erst beim 2. Klick zusätzlich zurück.
 function resetProgFilters() {
-  document.querySelectorAll('.day-btn').forEach(b => b.classList.add('active'));
+  const pastDays = getPastFestivalDays();
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', !pastDays.has(b.dataset.day)));
   document.getElementById('timeFrom').value = '08:00';
   document.getElementById('timeTo').value = '';
   selectedLocs.clear();
