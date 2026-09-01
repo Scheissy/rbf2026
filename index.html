@@ -436,7 +436,7 @@ input[type=file] { display: none; }
     </div>
     <label class="prog-hidden-toggle">
       <input type="checkbox" id="progShowHidden" onchange="renderProg()">
-      🙈 Ausgeblendete Künstler mit anzeigen
+      🙈 Ausgeblendete Künstler/Events mit anzeigen
     </label>
     <label class="prog-hidden-toggle">
       <input type="checkbox" id="fProgDuration" onchange="renderProg()">
@@ -648,6 +648,12 @@ let showDurations = {};
 // Fehlender Key = nicht markiert.
 let planFlags = {};
 
+// Ausgeblendete Sonderveranstaltungen: analog zu d.ausgeblendet bei Künstlern,
+// aber pro Event (nicht pro Künstler) - da Events keinen eigenen dataMap-
+// Eintrag haben, hier separat über das synthetische nid (z.B. "evt-0")
+// gespeichert. Fehlender Key = nicht ausgeblendet (wie bei planFlags).
+let hiddenEvents = {};
+
 // ── RBF_EVENTS (Sonderveranstaltungen) ──────────────────────────────────────
 // RBF_EVENTS kommt aus rbf-data.js: Veranstaltungen ohne einzelnen Künstler-
 // Auftritt im klassischen Sinn (Award-Shows, Eröffnungsfeier, Podcasts etc.),
@@ -723,7 +729,7 @@ function saveToStorage() {
       .filter(d => d.rp > 0 || d.rl > 0 || d.gesehen || d.customUrl || d.manual || d.ausgeblendet || d.kommentar || d.reinhoeren)
       .map(d => ({ n: d.name, rp: d.rp, rl: d.rl, s: d.gesehen, u: d.customUrl, manual: d.manual||false, edited: d.edited||false, genre: d.genre, herkunft: d.herkunft, geschlecht: d.geschlecht, rbfUrl: d.rbfUrl, h: d.ausgeblendet||false, c: d.kommentar||'', rh: d.reinhoeren||false }));
     const auftrittePayload = auftritte.length ? auftritte : [];
-    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, auftritteVersion: DATA_VERSION, showRatings, showDurations, planFlags, settings: appSettings }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ ratings: payload, auftritte: auftrittePayload, auftritteVersion: DATA_VERSION, showRatings, showDurations, planFlags, hiddenEvents, settings: appSettings }));
     document.getElementById('saveIndicator').textContent = '✓ gespeichert';
     setTimeout(() => document.getElementById('saveIndicator').textContent = '', 2000);
   } catch(e) { safeLog('Storage error', e); }
@@ -767,6 +773,7 @@ function loadFromStorage() {
     if (data.showRatings) showRatings = data.showRatings;
     if (data.showDurations) showDurations = data.showDurations;
     if (data.planFlags) planFlags = data.planFlags;
+    if (data.hiddenEvents) hiddenEvents = data.hiddenEvents;
     if (data.settings) appSettings = { ...appSettings, ...data.settings };
   } catch(e) { safeLog('Load error', e); }
 }
@@ -1283,7 +1290,10 @@ function getFilteredAuftritte() {
     if (appSettings.hiddenLocations.includes(a.location)) return false;
     if (selectedLocs.size > 0 && !selectedLocs.has(a.location)) return false;
     const d = dataMap[a.name];
-    if (!showHidden && d?.ausgeblendet) return false;
+    // Gleicher Haken wie bei ausgeblendeten Künstlern, gilt hier zusätzlich
+    // für einzeln ausgeblendete Sonderveranstaltungen (hiddenEvents statt
+    // d.ausgeblendet, da Events keinen dataMap-Eintrag haben).
+    if (!showHidden && ((d && d.ausgeblendet) || (a.isEvent && hiddenEvents[a.nid]))) return false;
     if (a.time) {
       if (fromVal && timeSortValue(a.time) < timeSortValue(fromVal)) return false;
       if (toVal && timeSortValue(a.time) > timeSortValue(toVal)) return false;
@@ -1363,6 +1373,17 @@ function toggleHidden(name) {
   renderKuenstlerPreservingScroll();
   if (currentTab === 'programm') renderProg();
   toast(d.ausgeblendet ? `„${name}" ausgeblendet 🙈` : `„${name}" wieder eingeblendet 👁`);
+}
+
+// Analog zu toggleHidden(), aber für Sonderveranstaltungen (kein dataMap-
+// Eintrag vorhanden) - Zustand hängt am synthetischen nid statt am Namen.
+function toggleEventHidden(nid) {
+  const wasHidden = !!hiddenEvents[nid];
+  if (wasHidden) delete hiddenEvents[nid];
+  else hiddenEvents[nid] = true;
+  saveToStorage();
+  renderProg();
+  toast(wasHidden ? 'Veranstaltung wieder eingeblendet 👁' : 'Veranstaltung ausgeblendet 🙈');
 }
 
 // Markiert einen Künstler zum "nochmal reinhören" - reine Merk-Funktion für
@@ -2179,10 +2200,14 @@ function renderProg() {
     const duration = showDurations[skey];
     const nj = escJs(a.name);
     const skeyEsc = escJs(skey);
-    html += `<div class="prog-item${d && d.ausgeblendet ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
+    // Vereinheitlichter "ist ausgeblendet"-Zustand: Künstler über d.ausgeblendet,
+    // Sonderveranstaltungen über hiddenEvents[a.nid] - beide teilen sich
+    // dieselbe Optik (Badge, gedimmte Zeile) und denselben Filter-Haken oben.
+    const isHidden = (d && d.ausgeblendet) || (a.isEvent && !!hiddenEvents[a.nid]);
+    html += `<div class="prog-item${isHidden ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
       <div class="prog-info">
-        <div class="prog-name">${a.isEvent ? (a.kategorie === 'Musik' ? '🎵 ' : '🎪 ') : ''}${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${d && d.ausgeblendet ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(a.name, nj, d, rid)}${soundRefIconHTML(a.name)}</div>
+        <div class="prog-name">${a.isEvent ? (a.kategorie === 'Musik' ? '🎵 ' : '🎪 ') : ''}${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${isHidden ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(a.name, nj, d, rid)}${soundRefIconHTML(a.name)}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : (a.isEvent ? `Sonderveranstaltung · ${a.kategorie}` : '')}</div>
         <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${escJs(a.location)}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
         <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
@@ -2214,7 +2239,10 @@ function renderProg() {
           const dd = dataMap[n];
           return dd ? `<span class="badge ${genderBadgeClass(dd.geschlecht)}" style="font-size:10px">${n}</span>` : `<span class="badge" style="font-size:10px;background:var(--surface2);color:var(--text2)">${n}</span>`;
         }).join('')}</div>` : ''}
-        ${a.url ? `<div style="margin-top:8px"><a class="prog-detail-link" style="margin-top:0" href="${a.url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${escJs(a.url)}')">↗ Veranstaltung öffnen</a></div>` : ''}
+      </div>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
+        ${a.url ? `<a class="prog-detail-link" style="margin-top:0" href="${a.url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${escJs(a.url)}')">↗ Veranstaltung öffnen</a>` : ''}
+        <button type="button" class="prog-detail-link-btn" onclick="event.stopPropagation();toggleEventHidden('${escJs(a.nid)}')">${hiddenEvents[a.nid] ? '👁 Einblenden' : '🙈 Ausblenden'}</button>
       </div>` : `<div class="prog-detail-row">Künstler nicht in der Liste gefunden.</div>`)}
       <div class="prog-detail-divider"></div>
       <div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
