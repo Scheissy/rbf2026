@@ -153,6 +153,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 
 /* PROG VIEW */
 .prog-filters { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.prog-filters-toggle { align-self: flex-start; background: none; border: none; padding: 2px 0; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.prog-filters-extra { display: none; flex-direction: column; gap: 8px; }
 .day-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .day-btn { flex: 1; min-width: 60px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; }
 .day-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
@@ -415,45 +417,48 @@ input[type=file] { display: none; }
       <select id="timeTo" onchange="renderProg()"></select>
       <button class="filter genre-filter-btn" id="locFilterBtn" onclick="openLocModal()" style="flex:1.5">📍 Alle Locations</button>
     </div>
-    <div class="filter-chips" id="locChips" style="display:none"></div>
-    <div class="prog-row2">
-      <div class="prog-rating-filter">
-        <span class="prog-rating-filter-label">Künstler Ø:</span>
-        <div class="stars stars-sm" id="fProgRatingStars"></div>
+    <button type="button" class="prog-filters-toggle" id="progFiltersToggleBtn" onclick="toggleProgFiltersPanel()" aria-expanded="false">▸ Weitere Filter</button>
+    <div class="prog-filters-extra" id="progFiltersExtra">
+      <div class="filter-chips" id="locChips" style="display:none"></div>
+      <div class="prog-row2">
+        <div class="prog-rating-filter">
+          <span class="prog-rating-filter-label">Künstler Ø:</span>
+          <div class="stars stars-sm" id="fProgRatingStars"></div>
+        </div>
+        <div class="prog-rating-filter">
+          <span class="prog-rating-filter-label">Auftritt:</span>
+          <div class="stars stars-sm" id="fProgShowRatingStars"></div>
+        </div>
       </div>
-      <div class="prog-rating-filter">
-        <span class="prog-rating-filter-label">Auftritt:</span>
-        <div class="stars stars-sm" id="fProgShowRatingStars"></div>
+      <div class="prog-row2">
+        <select id="fProgStatus" onchange="renderProg()">
+          <option value="">Alle Status</option>
+          <option value="ja">✓ Gesehen</option>
+          <option value="bekannt">👂 Bekannt (inkl. gesehen)</option>
+          <option value="unbekannt">– Unbekannt</option>
+        </select>
       </div>
+      <label class="prog-hidden-toggle">
+        <input type="checkbox" id="progShowHidden" onchange="renderProg()">
+        🙈 Ausgeblendete Künstler/Events mit anzeigen
+      </label>
+      <label class="prog-hidden-toggle">
+        <input type="checkbox" id="fProgDuration" onchange="renderProg()">
+        ⏱ Nur mit eingetragener Dauer
+      </label>
+      <label class="prog-hidden-toggle">
+        <input type="checkbox" id="fProgPlanned" onchange="renderProg()">
+        🎯 Nur als Ziel markierte
+      </label>
+      <label class="prog-hidden-toggle">
+        <input type="checkbox" id="settingShowMusicEvents" checked onchange="toggleSetting('showMusicEvents', this.checked)">
+        🎵 Musik-Events anzeigen
+      </label>
+      <label class="prog-hidden-toggle">
+        <input type="checkbox" id="settingShowOtherEvents" checked onchange="toggleSetting('showOtherEvents', this.checked)">
+        🎪 Sonstige Events anzeigen
+      </label>
     </div>
-    <div class="prog-row2">
-      <select id="fProgStatus" onchange="renderProg()">
-        <option value="">Alle Status</option>
-        <option value="ja">✓ Gesehen</option>
-        <option value="bekannt">👂 Bekannt (inkl. gesehen)</option>
-        <option value="unbekannt">– Unbekannt</option>
-      </select>
-    </div>
-    <label class="prog-hidden-toggle">
-      <input type="checkbox" id="progShowHidden" onchange="renderProg()">
-      🙈 Ausgeblendete Künstler/Events mit anzeigen
-    </label>
-    <label class="prog-hidden-toggle">
-      <input type="checkbox" id="fProgDuration" onchange="renderProg()">
-      ⏱ Nur mit eingetragener Dauer
-    </label>
-    <label class="prog-hidden-toggle">
-      <input type="checkbox" id="fProgPlanned" onchange="renderProg()">
-      🎯 Nur als Ziel markierte
-    </label>
-    <label class="prog-hidden-toggle">
-      <input type="checkbox" id="settingShowMusicEvents" checked onchange="toggleSetting('showMusicEvents', this.checked)">
-      🎵 Musik-Events anzeigen
-    </label>
-    <label class="prog-hidden-toggle">
-      <input type="checkbox" id="settingShowOtherEvents" checked onchange="toggleSetting('showOtherEvents', this.checked)">
-      🎪 Sonstige Events anzeigen
-    </label>
   </div>
   <div class="prog-total-time" id="progTotalTime" style="display:none"></div>
   <div class="prog-list" id="progList"></div>
@@ -708,7 +713,7 @@ let statsAusgeblendetFilter = false;
 // lebt jetzt rein hier, gesetzt/zurückgesetzt über filterByStat().
 let kuenstlerSeenFilter = '';
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
-let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true, showMusicEvents: true, showOtherEvents: true };
+let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true, showMusicEvents: true, showOtherEvents: true, progFiltersExpanded: false };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
 let selectedLocs = new Set(); // Mehrfachauswahl im Location-Filter der Programm-Übersicht (leer = alle)
 let locFilterOptions = []; // aktuell (nach Tag/Uhrzeit) verfügbare Locations fürs Modal
@@ -1804,6 +1809,25 @@ function applySettingsUI() {
   document.getElementById('settingShowMusicEvents').checked = appSettings.showMusicEvents;
   document.getElementById('settingShowOtherEvents').checked = appSettings.showOtherEvents;
   updateSoundRefFilterVisibility();
+  updateProgFiltersPanelVisibility();
+}
+
+// Ein-/Ausklappen des selten genutzten unteren Teils der Programm-Filter
+// (alles unterhalb der Zeit-/Location-Auswahl) - Zustand wird wie die
+// übrigen appSettings persistiert, damit die Wahl über Reloads erhalten bleibt.
+function toggleProgFiltersPanel() {
+  appSettings.progFiltersExpanded = !appSettings.progFiltersExpanded;
+  updateProgFiltersPanelVisibility();
+  saveToStorage();
+}
+function updateProgFiltersPanelVisibility() {
+  const panel = document.getElementById('progFiltersExtra');
+  const btn = document.getElementById('progFiltersToggleBtn');
+  if (!panel || !btn) return;
+  const expanded = !!appSettings.progFiltersExpanded;
+  panel.style.display = expanded ? 'flex' : 'none';
+  btn.textContent = expanded ? '▾ Weniger Filter' : '▸ Weitere Filter';
+  btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
 }
 
 function toggleDay(btn) { btn.classList.toggle('active'); renderProg(); }
