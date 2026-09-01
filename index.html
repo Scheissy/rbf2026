@@ -327,6 +327,21 @@ input[type=file] { display: none; }
   </div>
 </div>
 
+<div class="modal-backdrop" id="locFilterInfoModal" onclick="handleLocFilterInfoBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📍 Warum fehlt eine Location?</div>
+      <button class="modal-close" onclick="closeLocFilterInfoModal()">✕</button>
+    </div>
+    <div class="modal-body" style="font-size:14px;line-height:1.5">
+      <p style="margin:0 0 10px">Über <b>„Locations verwalten"</b> in den Einstellungen lassen sich einzelne Spielstätten dauerhaft ausblenden.</p>
+      <p style="margin:0 0 10px">Das ist eine <b>Dauereinstellung</b>, kein normaler Filter: eine dort ausgeblendete Location bleibt auch dann unsichtbar, wenn „Filter zurücksetzen" getippt oder „Ausgeblendete Künstler/Events mit anzeigen" aktiviert wird.</p>
+      <p style="margin:0 0 12px">Fehlt also eine Location trotz zurückgesetzter Filter, lohnt ein Blick dorthin.</p>
+      <button type="button" class="prog-quick-btn" style="width:100%" onclick="closeLocFilterInfoModal();switchTab('io');openLocManageModal()">📍 Locations verwalten öffnen</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="soundRefModal" onclick="handleSoundRefBackdropClick(event)">
   <div class="modal">
     <div class="modal-header">
@@ -434,7 +449,10 @@ input[type=file] { display: none; }
     <div class="prog-row2">
       <select id="timeFrom" onchange="renderProg()"></select>
       <select id="timeTo" onchange="renderProg()"></select>
-      <button class="filter genre-filter-btn" id="locFilterBtn" onclick="openLocModal()" style="flex:1.5">📍 Alle Locations</button>
+      <div style="flex:1.5;display:flex;gap:4px;align-items:center">
+        <button class="filter genre-filter-btn" id="locFilterBtn" onclick="openLocModal()" style="flex:1">📍 Alle Locations</button>
+        <button type="button" class="info-icon-btn" onclick="event.stopPropagation();openLocFilterInfoModal()" title="Warum fehlt eine Location?" aria-label="Erklärung zu fehlenden Locations anzeigen">ⓘ</button>
+      </div>
     </div>
     <button type="button" class="prog-filters-toggle" id="progFiltersToggleBtn" onclick="toggleProgFiltersPanel()" aria-expanded="false">▸ Weitere Filter</button>
     <div class="prog-filters-extra" id="progFiltersExtra">
@@ -2055,6 +2073,21 @@ function closeJumpToNowInfoModal() {
 }
 function handleJumpToNowInfoBackdropClick(e) {
   if (e.target.id === 'jumpToNowInfoModal') closeJumpToNowInfoModal();
+}
+
+// Bottom-Sheet analog zu openJumpToNowInfoModal(), aber für den Sonderfall
+// "dauerhaft ausgeblendete Location über Locations verwalten" - erreichbar
+// direkt dort, wo eine fehlende Location tatsächlich auffällt (Location-
+// Filter-Button), statt beim inhaltlich verwandten, aber vom Auffindungsort
+// her kontextfremden "Jetzt"-ⓘ.
+function openLocFilterInfoModal() {
+  document.getElementById('locFilterInfoModal').classList.add('open');
+}
+function closeLocFilterInfoModal() {
+  document.getElementById('locFilterInfoModal').classList.remove('open');
+}
+function handleLocFilterInfoBackdropClick(e) {
+  if (e.target.id === 'locFilterInfoModal') closeLocFilterInfoModal();
 }
 
 // Location-Filter zeigt nur Spielstätten, die im aktuell gewählten Zeitraum
