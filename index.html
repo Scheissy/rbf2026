@@ -181,6 +181,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .comment-icon-btn:active { background: var(--surface2); }
 .soundref-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent; color: #6cc9e8; font-size: 12px; cursor: pointer; padding: 0; vertical-align: middle; flex-shrink: 0; }
 .soundref-icon-btn:active { background: var(--surface2); }
+.info-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: none; background: transparent; color: var(--text2); font-size: 14px; cursor: pointer; padding: 0; vertical-align: middle; flex-shrink: 0; }
+.info-icon-btn:active { background: var(--surface2); }
 .soundref-entry { border-left: 3px solid #6cc9e8; padding-left: 10px; }
 .soundref-name { font-weight: 600; font-size: 14px; color: var(--text); }
 .soundref-kategorie { font-size: 12px; color: var(--text2); margin-top: 3px; line-height: 1.4; }
@@ -311,6 +313,20 @@ input[type=file] { display: none; }
   </div>
 </div>
 
+<div class="modal-backdrop" id="jumpToNowInfoModal" onclick="handleJumpToNowInfoBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🕐 Wie funktioniert „Jetzt“?</div>
+      <button class="modal-close" onclick="closeJumpToNowInfoModal()">✕</button>
+    </div>
+    <div class="modal-body" style="font-size:14px;line-height:1.5">
+      <p style="margin:0 0 10px">Springt auf den aktuellen Festivaltag und die aktuelle Uhrzeit.</p>
+      <p style="margin:0 0 10px"><b>1. Tippen:</b> Nur Tag und Uhrzeit werden angepasst - alle anderen Filter (Location, Bewertungen, Status, Dauer, Ziel) bleiben unverändert.</p>
+      <p style="margin:0">Steht man bereits auf der aktuellen Zeit, setzt ein <b>weiteres Tippen</b> zusätzlich diese übrigen Filter zurück. „Ausgeblendete anzeigen" sowie die Musik-/Sonstige-Events-Anzeige bleiben dabei immer unangetastet.</p>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="soundRefModal" onclick="handleSoundRefBackdropClick(event)">
   <div class="modal">
     <div class="modal-header">
@@ -410,7 +426,10 @@ input[type=file] { display: none; }
     </div>
     <div class="prog-row2">
       <button class="prog-quick-btn" onclick="resetProgFilters()">↺ Filter zurücksetzen</button>
-      <button class="prog-quick-btn" onclick="jumpToNow()">🕐 Jetzt</button>
+      <div style="flex:1;display:flex;gap:4px;align-items:center">
+        <button class="prog-quick-btn" style="flex:1" onclick="jumpToNow()">🕐 Jetzt</button>
+        <button type="button" class="info-icon-btn" onclick="event.stopPropagation();openJumpToNowInfoModal()" title="Wie funktioniert „Jetzt“?" aria-label="Erklärung zum Jetzt-Button anzeigen">ⓘ</button>
+      </div>
     </div>
     <div class="prog-row2">
       <select id="timeFrom" onchange="renderProg()"></select>
@@ -1983,26 +2002,59 @@ function resetProgFilters() {
 // Springt auf den heutigen Festivaltag (falls es einer ist) und die aktuelle
 // Uhrzeit minus Puffer (mind. 30 Min, siehe getFestivalContext), damit gerade
 // laufende Shows nicht rausgefiltert werden.
+// Zweistufiges Verhalten: 1. Klick passt NUR Tag+Zeit an (übrige Filter
+// bleiben erhalten, damit man z.B. einen gesetzten Bewertungsfilter nicht
+// verliert, nur weil man kurz zu "jetzt" springen will). Steht man bereits
+// auf Tag+Zeit von "jetzt" (= 2. Klick direkt hintereinander, oder man war
+// eh schon da), setzt der Klick zusätzlich die übrigen Programm-Filter
+// zurück (Location, Bewertungen, Status, Dauer, Ziel) - bewusst OHNE
+// "Ausgeblendete anzeigen" und OHNE die beiden Event-Sichtbarkeits-Haken
+// (Musik-/Sonstige Events anzeigen), das sind Dauereinstellungen, keine
+// Programm-Filter im engeren Sinn.
 function jumpToNow() {
   const ctx = getFestivalContext();
   if (!ctx) { toast('Heute ist kein Festivaltag', false); return; }
-  document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', b.dataset.day === ctx.day));
+
+  const dayBtns = [...document.querySelectorAll('.day-btn')];
   const fromSel = document.getElementById('timeFrom');
+  const toSel = document.getElementById('timeTo');
+  const alreadyAtNow = dayBtns.every(b => b.classList.contains('active') === (b.dataset.day === ctx.day))
+    && fromSel.value === ctx.time
+    && toSel.value === '';
+
+  dayBtns.forEach(b => b.classList.toggle('active', b.dataset.day === ctx.day));
   if ([...fromSel.options].some(o => o.value === ctx.time)) fromSel.value = ctx.time;
-  document.getElementById('timeTo').value = '';
-  // Alle weiteren Filter zurücksetzen, damit "Jetzt" wirklich die volle
-  // aktuelle Übersicht zeigt und nicht durch alte Location-/Bewertungs-/
-  // Status-Filter verzerrt wird. "Ausgeblendete anzeigen" bleibt unangetastet.
-  selectedLocs.clear();
-  document.getElementById('fProgStatus').value = '';
-  document.getElementById('fProgDuration').checked = false;
-  document.getElementById('fProgPlanned').checked = false;
-  progRatingFilter = 0;
-  renderProgRatingStars();
-  progShowRatingFilter = 0;
-  renderProgShowRatingStars();
-  renderProg();
-  toast(`Zu ${ctx.day}, ${ctx.time} Uhr gesprungen ✓`);
+  toSel.value = '';
+
+  if (alreadyAtNow) {
+    selectedLocs.clear();
+    document.getElementById('fProgStatus').value = '';
+    document.getElementById('fProgDuration').checked = false;
+    document.getElementById('fProgPlanned').checked = false;
+    progRatingFilter = 0;
+    renderProgRatingStars();
+    progShowRatingFilter = 0;
+    renderProgShowRatingStars();
+    renderProg();
+    toast(`Zu ${ctx.day}, ${ctx.time} Uhr gesprungen + übrige Filter zurückgesetzt ✓`);
+  } else {
+    renderProg();
+    toast(`Zu ${ctx.day}, ${ctx.time} Uhr gesprungen ✓`);
+  }
+}
+
+// Bottom-Sheet mit statischer Erklärung des zweistufigen "Jetzt"-Verhaltens
+// (siehe jumpToNow() oben) - bewusst als eigenes, jederzeit erreichbares
+// ⓘ-Icon statt Hover-Tooltip, da Tooltips auf Touch-Geräten nicht
+// zuverlässig funktionieren (gleiches Muster wie beim Kommentar-Icon).
+function openJumpToNowInfoModal() {
+  document.getElementById('jumpToNowInfoModal').classList.add('open');
+}
+function closeJumpToNowInfoModal() {
+  document.getElementById('jumpToNowInfoModal').classList.remove('open');
+}
+function handleJumpToNowInfoBackdropClick(e) {
+  if (e.target.id === 'jumpToNowInfoModal') closeJumpToNowInfoModal();
 }
 
 // Location-Filter zeigt nur Spielstätten, die im aktuell gewählten Zeitraum
