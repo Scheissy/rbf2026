@@ -402,7 +402,6 @@ input[type=file] { display: none; }
       <input type="text" id="search" placeholder="Suchen …" oninput="onSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
       <span class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</span>
     </div>
-    <button type="button" class="filter-reset-btn" id="filterResetBtn" onclick="filterByStat('gesamt')" title="Alle Filter zurücksetzen">↺</button>
     <select class="filter" id="fGender" onchange="render()">
       <option value="">Alle</option>
       <option value="männlich">männlich</option>
@@ -421,6 +420,7 @@ input[type=file] { display: none; }
       <span class="prog-rating-filter-label">Künstler Ø:</span>
       <div class="stars stars-sm" id="fKuenstlerAvgFilterStars"></div>
     </div>
+    <button type="button" class="filter-reset-btn" id="filterResetBtn" onclick="filterByStat('gesamt')" title="Alle Filter zurücksetzen">↺</button>
   </div>
   <div class="filter-chips" id="genreChips" style="display:none"></div>
   <div class="statsbar-wrap">
