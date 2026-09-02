@@ -1446,7 +1446,7 @@ function toggleReinhoeren(name) {
   saveToStorage();
   renderArtistItem(name);
   updateStats();
-  toast(d.reinhoeren ? `„${name}" zum Reinhören markiert 🎧` : `Markierung bei „${name}" entfernt`);
+  toast(d.reinhoeren ? `„${name}" zum Reinhören vorgemerkt 🎧` : `„${name}" aus dem Reinhören entfernt`);
 }
 
 // ── KOMMENTAR ─────────────────────────────────────────────────────────────────
@@ -1662,7 +1662,7 @@ function renderArtistItem(name) {
       </div>
       <div class="detail-section">
         <button type="button" class="detail-link-btn" onclick="toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</button>
-        <button type="button" class="detail-link-btn" onclick="toggleReinhoeren('${nj}')">${d.reinhoeren ? '🎧 Entmarkieren' : '🎧 Markieren'}</button>
+        <button type="button" class="detail-link-btn" onclick="toggleReinhoeren('${nj}')">${d.reinhoeren ? '🎧 Entfernen' : '🎧 Reinhören'}</button>
       </div>
       <div class="detail-section">
         <div class="detail-label">Auftritte</div>
