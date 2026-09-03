@@ -49,7 +49,7 @@
 // Wird bei jedem inhaltlichen Update von RAW_AUFTRITTE (Zeiten/Locations) hochgezählt.
 // Dient dazu, veraltete lokal gespeicherte Auftrittsdaten automatisch zu verwerfen,
 // sobald ein neuerer Code-Stand geladen wird - ohne dass manuell zurückgesetzt werden muss.
-const DATA_VERSION = '2026-09-03c';
+const DATA_VERSION = '2026-09-03d';
 
 const DAY_ORDER = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
 
@@ -61,6 +61,11 @@ const ANCHOR_AWARD_NOMINEES=["Big Wett","Dov'è Liana","GANNA","Just For Fun","N
 // automatischer Abgleich). Neue Kategorie = neues Objekt anhängen. "acts" ist
 // nach Match-Stärke sortiert (bester Treffer zuerst).
 const SOUND_REFERENCES=[
+  {
+    "referenz": ["Lola Young"],
+    "kategorie": "Rohe, ungefilterte emotionale Popmusik mit rauchig-kratziger Stimme und konfessionellen Texten",
+    "acts": ["Mya Mehmi"]
+  },
   {
     "referenz": ["Blumentopf"],
     "kategorie": "Deutscher Boom-Bap / wortwitzige Crew-Rap-Tradition",
