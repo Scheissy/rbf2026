@@ -2022,10 +2022,17 @@ function getPastFestivalDays() {
   return new Set(DAY_ORDER.slice(0, todayIdx));
 }
 
+// Wird beim allerersten Öffnen des Programm-Tabs aufgerufen (siehe
+// smartProgDefaultsApplied) und springt automatisch auf "heute". Tage-Auswahl
+// bewusst identisch zu resetProgFilters() (heute + alle kommenden Tage,
+// vergangene Tage weg) - nur die Zeit bleibt hier "smart" auf die aktuelle
+// Uhrzeit statt auf 08:00, damit der allererste Blick direkt zeigt, was
+// gerade läuft/ansteht.
 function applySmartProgDefaults() {
   const ctx = getFestivalContext();
   if (!ctx) return; // heute ist kein Festivaltag -> Filter unverändert lassen
-  document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', b.dataset.day === ctx.day));
+  const pastDays = getPastFestivalDays();
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', !pastDays.has(b.dataset.day)));
   const fromSel = document.getElementById('timeFrom');
   if ([...fromSel.options].some(o => o.value === ctx.time)) fromSel.value = ctx.time;
 }
