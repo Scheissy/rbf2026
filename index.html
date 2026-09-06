@@ -1208,10 +1208,20 @@ function miniStars(val) {
   return miniStarsHTML(val, 'prog-mini-star');
 }
 // Editierbare Sterne innerhalb der Programm-Detailansicht (eigener Klick-Handler,
-// da derselbe Künstler mit mehreren Auftritten gleichzeitig in der Liste stehen kann)
+// da derselbe Künstler mit mehreren Auftritten gleichzeitig in der Liste stehen kann).
+// WICHTIG: "name" ist hier IMMER der rohe (unescapte) Künstlername - für den
+// dataMap-Lookup nötig. Das Escaping für den onclick-Aufbau passiert bewusst
+// erst intern (analog zu starsHTML()/planFlagHTML()) - vorher wurde hier teils
+// der bereits escapte Name übergeben, was den dataMap-Lookup bei Namen mit
+// Apostroph (z.B. "Dov'è Liana") stillschweigend fehlschlagen ließ, UND beim
+// Neu-Zeichnen nach einem Klick teils der rohe Name direkt (unescaped) in den
+// nächsten onclick eingebaut wurde, was dessen JS-Syntax brach - beides zusammen
+// war der Grund, warum die Bewertung für Künstler mit Sonderzeichen weder
+// angezeigt noch nach dem ersten Setzen geändert werden konnte.
 function progStarsHTML(rid, name, field) {
   const val = dataMap[name] ? dataMap[name][field] : 0;
-  return ratingStarsHTML(val, 'star', n => `setProgRating('${rid}','${name}','${field}',${n})`);
+  const nameEsc = escJs(name);
+  return ratingStarsHTML(val, 'star', n => `setProgRating('${rid}','${nameEsc}','${field}',${n})`);
 }
 // Auftritts-Bewertung: eigenständige Sterne-Skala pro konkreter Show (nicht pro Künstler).
 // Fließt bewusst NICHT in dataMap/rp/rl bzw. den Bewertungsdurchschnitt ein.
@@ -1559,8 +1569,14 @@ function handleSoundRefBackdropClick(e) {
 }
 
 // Erzeugt die Gesehen-Buttons (wiederverwendet in Künstler-Ansicht)
-function seenButtonsHTML(nj, d, progRid) {
-  const handler = progRid ? `setSeenProg('${progRid}','${nj}',` : `setSeen('${nj}',`;
+// WICHTIG: "name" ist hier IMMER der rohe (unescapte) Künstlername - das
+// Escaping für den onclick-Aufbau passiert bewusst erst intern (gleiches
+// Muster/gleicher Grund wie bei progStarsHTML() oben: vorher wurde teils der
+// bereits escapte Name übergeben, was bei Namen mit Apostroph den nächsten
+// Klick auf "Gesehen"/"Bekannt" nach einem Neu-Zeichnen brechen konnte).
+function seenButtonsHTML(name, d, progRid) {
+  const nameEsc = escJs(name);
+  const handler = progRid ? `setSeenProg('${progRid}','${nameEsc}',` : `setSeen('${nameEsc}',`;
   return `<div class="seen-btns"${progRid ? ` id="${progRid}-seen"` : ''}>
     <button class="seen-btn${d.gesehen === 'bekannt' ? ' active-bekannt' : ''}" onclick="${handler}'bekannt')">👂 Bekannt</button>
     <button class="seen-btn${d.gesehen === 'ja' ? ' active-ja' : ''}" onclick="${handler}'ja')">✓ Gesehen</button>
@@ -1654,7 +1670,7 @@ function renderArtistItem(name) {
       </div>
       <div class="detail-section">
         <div class="detail-label">Gesehen</div>
-        ${seenButtonsHTML(nj, d)}
+        ${seenButtonsHTML(name, d)}
       </div>
       <div class="detail-section">
         <div class="detail-label">Kommentar</div>
@@ -2382,10 +2398,10 @@ function renderProg() {
     </div>
     <div class="prog-detail collapsed" id="${rid}-detail">
       ${d ? `<div class="prog-detail-row prog-detail-row-split" onclick="event.stopPropagation()">
-        <div class="prog-detail-pair"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,nj,'rp')}</div></div>
-        ${appSettings.showListening ? `<div class="prog-detail-pair"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,nj,'rl')}</div></div>` : ''}
+        <div class="prog-detail-pair"><span class="prog-detail-label">Promo</span><div class="stars stars-sm" id="${rid}-rp">${progStarsHTML(rid,a.name,'rp')}</div></div>
+        ${appSettings.showListening ? `<div class="prog-detail-pair"><span class="prog-detail-label">Listening</span><div class="stars stars-sm" id="${rid}-rl">${progStarsHTML(rid,a.name,'rl')}</div></div>` : ''}
       </div>
-      <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Gesehen</span>${seenButtonsHTML(nj, d, rid)}</div>
+      <div class="prog-detail-row" onclick="event.stopPropagation()"><span class="prog-detail-label">Gesehen</span>${seenButtonsHTML(a.name, d, rid)}</div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
         <a class="prog-detail-link" style="margin-top:0" href="${d.customUrl || d.rbfUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();return openExternal(event,'${escJs(d.customUrl || d.rbfUrl)}')">↗ RBF-Seite öffnen</a>
         <button type="button" class="prog-detail-link-btn" onclick="event.stopPropagation();toggleHidden('${nj}')">${d.ausgeblendet ? '👁 Einblenden' : '🙈 Ausblenden'}</button>
