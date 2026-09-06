@@ -174,7 +174,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .prog-item { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
 .prog-item-hidden { opacity: .55; }
 .prog-item:active { background: var(--surface2); }
-.prog-time-col { font-size: 13px; font-weight: 700; color: var(--accent); width: 44px; flex-shrink: 0; padding-top: 1px; }
+.prog-time-col { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 44px; flex-shrink: 0; padding-top: 1px; }
+.prog-time-val { font-size: 13px; font-weight: 700; color: var(--accent); text-align: center; }
 .prog-info { flex: 1; min-width: 0; }
 .prog-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .comment-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; vertical-align: middle; flex-shrink: 0; }
@@ -188,8 +189,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .soundref-kategorie { font-size: 12px; color: var(--text2); margin-top: 3px; line-height: 1.4; }
 .prog-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
 .prog-loc { font-size: 11px; color: var(--accent); margin-top: 2px; }
-.prog-rating-summary { display: flex; align-items: center; gap: 5px; margin-top: 4px; }
-.prog-avg-val { font-size: 10px; color: var(--text2); }
+.prog-avg-badge { display: flex; align-items: center; justify-content: center; gap: 1px; flex-shrink: 0; visibility: hidden; }
+.prog-avg-badge.has-rating { visibility: visible; }
 .prog-rating-arrow { font-size: 11px; color: var(--text3); flex-shrink: 0; padding-top: 2px; }
 .prog-right-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
 .plan-flag-btn { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; border: none; background: transparent; font-size: 14px; cursor: pointer; padding: 0; flex-shrink: 0; color: var(--text3); opacity: 0.45; filter: grayscale(1); }
@@ -1391,8 +1392,9 @@ function setProgRating(rid, name, field, val) {
     if (starsEl) starsEl.innerHTML = progStarsHTML(r, name, field);
     const summaryEl = document.getElementById(`${r}-summary`);
     if (summaryEl) {
-      summaryEl.style.display = vals.length ? '' : 'none';
-      summaryEl.innerHTML = `<span>${miniStars(avg)}</span><span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>`;
+      summaryEl.classList.toggle('has-rating', vals.length > 0);
+      summaryEl.innerHTML = miniStars(avg);
+      summaryEl.title = vals.length ? `Künstler-Ø-Bewertung: ${avg.toFixed(1)}` : '';
     }
   });
 }
@@ -2377,22 +2379,21 @@ function renderProg() {
     // dieselbe Optik (Badge, gedimmte Zeile) und denselben Filter-Haken oben.
     const isHidden = (d && d.ausgeblendet) || (a.isEvent && !!hiddenEvents[a.nid]);
     html += `<div class="prog-item${isHidden ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
-      <div class="prog-time-col">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
+      <div class="prog-time-col">
+        <div class="prog-time-val">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
+        ${planFlagHTML(rid, skey)}
+      </div>
       <div class="prog-info">
         <div class="prog-name">${a.isEvent ? (a.kategorie === 'Musik' ? '🎵 ' : '🎪 ') : ''}${a.name}${anchorBadgeHTML(a.name, true)}${d ? ` <span class="badge ${gc}" style="font-size:9px">${d.geschlecht}</span>` : ''}${isHidden ? ' <span class="badge b-hidden" style="font-size:9px">🙈</span>' : ''}${commentIconHTML(a.name, nj, d, rid)}${soundRefIconHTML(a.name)}</div>
         <div class="prog-meta">${d ? d.genre + ' · ' + d.herkunft : (a.isEvent ? `Sonderveranstaltung · ${a.kategorie}` : '')}</div>
         <div class="prog-loc">${a.location ? (appSettings.showMapsLinks ? `📍 <a href="${mapsUrl(a.location)}" target="_blank" rel="noopener noreferrer" onclick="return openMaps(event,'${escJs(a.location)}')">${a.location}</a>` : `📍 ${a.location}`) : `📍 <span style="opacity:.6">TBA</span>`}</div>
-        <div class="prog-rating-summary" id="${rid}-summary" style="${vals.length ? '' : 'display:none'}">
-          <span>${miniStars(avg)}</span>
-          <span class="prog-avg-val">⌀ ${avg.toFixed(1)}</span>
-        </div>
         <div class="prog-show-meta-row" id="${rid}-showmetarow" style="${(showRating || duration !== undefined) ? '' : 'display:none'}">
           <div class="prog-showrating-summary" id="${rid}-showsummary" style="${showRating ? '' : 'display:none'}">${miniStarsShow(showRating)}</div>
           <div class="prog-duration-summary" id="${rid}-durationsummary" style="${duration !== undefined ? '' : 'display:none'}">${duration !== undefined ? `⏱ ${formatDuration(duration)}` : ''}</div>
         </div>
       </div>
       <div class="prog-right-col">
-        ${planFlagHTML(rid, skey)}
+        <div class="prog-avg-badge${vals.length ? ' has-rating' : ''}" id="${rid}-summary" title="${vals.length ? `Künstler-Ø-Bewertung: ${avg.toFixed(1)}` : ''}">${miniStars(avg)}</div>
         <div class="prog-rating-arrow" id="${rid}-arrow">▸</div>
       </div>
     </div>
