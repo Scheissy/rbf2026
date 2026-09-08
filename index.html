@@ -153,7 +153,8 @@ button.filter { cursor: pointer; white-space: nowrap; }
 
 /* PROG VIEW */
 .prog-filters { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
-.prog-filters-toggle { align-self: flex-start; background: none; border: none; padding: 2px 0; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.prog-filters-toggle { align-self: flex-start; background: none; border: none; padding: 2px 0; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; }
+.prog-filters-active-dot { display: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .prog-filters-extra { display: none; flex-direction: column; gap: 8px; }
 .day-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .day-btn { flex: 1; min-width: 60px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -336,6 +337,10 @@ input[type=file] { display: none; }
       <button class="modal-close" onclick="closeLocFilterInfoModal()">✕</button>
     </div>
     <div class="modal-body" style="font-size:14px;line-height:1.5">
+      <div id="locFilterInfoSelection" style="display:none;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:600;margin-bottom:6px">Aktuell ausgewählte Locations:</div>
+        <div id="locFilterInfoSelectionList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
       <p style="margin:0 0 10px">Über <b>„Locations verwalten"</b> in den Einstellungen lassen sich einzelne Spielstätten dauerhaft ausblenden.</p>
       <p style="margin:0 0 10px">Das ist eine <b>Dauereinstellung</b>, kein normaler Filter: eine dort ausgeblendete Location bleibt auch dann unsichtbar, wenn „Filter zurücksetzen" getippt oder „Ausgeblendete Künstler/Events mit anzeigen" aktiviert wird.</p>
       <p style="margin:0 0 12px">Fehlt also eine Location trotz zurückgesetzter Filter, lohnt ein Blick dorthin.</p>
@@ -470,9 +475,10 @@ input[type=file] { display: none; }
         <button type="button" class="info-icon-btn" onclick="event.stopPropagation();openLocFilterInfoModal()" title="Warum fehlt eine Location?" aria-label="Erklärung zu fehlenden Locations anzeigen">ⓘ</button>
       </div>
     </div>
-    <button type="button" class="prog-filters-toggle" id="progFiltersToggleBtn" onclick="toggleProgFiltersPanel()" aria-expanded="false">▸ Weitere Filter</button>
+    <button type="button" class="prog-filters-toggle" id="progFiltersToggleBtn" onclick="toggleProgFiltersPanel()" aria-expanded="false">
+      <span id="progFiltersToggleLabel">▸ Weitere Filter</span><span class="prog-filters-active-dot" id="progFiltersActiveDot" title="Es sind versteckte Filter aktiv"></span>
+    </button>
     <div class="prog-filters-extra" id="progFiltersExtra">
-      <div class="filter-chips" id="locChips" style="display:none"></div>
       <div class="prog-row2">
         <div class="prog-rating-filter">
           <span class="prog-rating-filter-label">Künstler Ø:</span>
@@ -494,14 +500,6 @@ input[type=file] { display: none; }
         </select>
       </div>
       <label class="prog-hidden-toggle">
-        <input type="checkbox" id="progShowHidden" onchange="renderProg()">
-        🙈 Ausgeblendete Künstler/Events mit anzeigen
-      </label>
-      <label class="prog-hidden-toggle">
-        <input type="checkbox" id="fProgDuration" onchange="renderProg()">
-        ⏱ Nur mit eingetragener Dauer
-      </label>
-      <label class="prog-hidden-toggle">
         <input type="checkbox" id="fProgPlanned" onchange="renderProg()">
         🎯 Nur als Ziel markierte
       </label>
@@ -512,6 +510,14 @@ input[type=file] { display: none; }
       <label class="prog-hidden-toggle">
         <input type="checkbox" id="settingShowOtherEvents" checked onchange="toggleSetting('showOtherEvents', this.checked)">
         🎪 Sonstige Events anzeigen
+      </label>
+      <label class="prog-hidden-toggle">
+        <input type="checkbox" id="fProgDuration" onchange="renderProg()">
+        ⏱ Nur mit eingetragener Dauer
+      </label>
+      <label class="prog-hidden-toggle">
+        <input type="checkbox" id="progShowHidden" onchange="renderProg()">
+        🙈 Ausgeblendete Künstler/Events mit anzeigen
       </label>
     </div>
   </div>
@@ -1910,11 +1916,41 @@ function toggleProgFiltersPanel() {
 function updateProgFiltersPanelVisibility() {
   const panel = document.getElementById('progFiltersExtra');
   const btn = document.getElementById('progFiltersToggleBtn');
-  if (!panel || !btn) return;
+  const label = document.getElementById('progFiltersToggleLabel');
+  if (!panel || !btn || !label) return;
   const expanded = !!appSettings.progFiltersExpanded;
   panel.style.display = expanded ? 'flex' : 'none';
-  btn.textContent = expanded ? '▾ Weniger Filter' : '▸ Weitere Filter';
+  label.textContent = expanded ? '▾ Weniger Filter' : '▸ Weitere Filter';
   btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  updateProgFiltersActiveIndicator();
+}
+
+// Prüft, ob mindestens einer der Filter INNERHALB des einklappbaren "Weitere
+// Filter"-Bereichs aktiv ist - bewusst OHNE die beiden Event-Sichtbarkeits-
+// Haken (Musik-/Sonstige Events), da deren "Default" nicht eindeutig ist
+// (reine Geschmackssache, kein klassischer "eingeschränkter" Filterzustand).
+// Der Location-Filter zählt hier ebenfalls nicht mit, da sein Button
+// (außerhalb dieses Panels, immer sichtbar) bereits selbst per Beschriftung
+// anzeigt, wenn eine Auswahl aktiv ist - dort besteht also kein "versteckter"
+// Zustand, den es zusätzlich zu kennzeichnen gilt.
+function anyHiddenProgFilterActive() {
+  return progSelectedGenres.size > 0
+    || progRatingFilter > 0
+    || progShowRatingFilter > 0
+    || document.getElementById('fProgStatus').value !== ''
+    || document.getElementById('fProgPlanned').checked
+    || document.getElementById('fProgDuration').checked
+    || document.getElementById('progShowHidden').checked;
+}
+
+// Zeigt den kleinen Punkt am "Weitere Filter"-Button NUR, wenn das Panel
+// eingeklappt ist UND mindestens einer der versteckten Filter aktiv ist -
+// bei aufgeklapptem Panel sieht man die aktiven Filter ja bereits direkt.
+function updateProgFiltersActiveIndicator() {
+  const dot = document.getElementById('progFiltersActiveDot');
+  if (!dot) return;
+  const expanded = !!appSettings.progFiltersExpanded;
+  dot.style.display = (!expanded && anyHiddenProgFilterActive()) ? 'inline-block' : 'none';
 }
 
 function toggleDay(btn) { btn.classList.toggle('active'); renderProg(); }
@@ -2178,6 +2214,21 @@ function handleJumpToNowInfoBackdropClick(e) {
 // Filter-Button), statt beim inhaltlich verwandten, aber vom Auffindungsort
 // her kontextfremden "Jetzt"-ⓘ.
 function openLocFilterInfoModal() {
+  // Zeigt zusätzlich die aktuell ausgewählten Locations an - praktisch, weil
+  // ausgewählte Locations als Chips im einklappbaren "Weitere Filter"-Bereich
+  // stecken (dort potenziell unübersichtlich bei vielen Auswahlen) und man
+  // sonst nur die reine Anzahl über die Button-Beschriftung sieht.
+  const section = document.getElementById('locFilterInfoSelection');
+  const list = document.getElementById('locFilterInfoSelectionList');
+  if (section && list) {
+    if (selectedLocs.size > 0) {
+      list.innerHTML = [...selectedLocs].sort().map(l => `<span class="badge" style="font-size:11px">${l}</span>`).join('');
+      section.style.display = 'block';
+    } else {
+      list.innerHTML = '';
+      section.style.display = 'none';
+    }
+  }
   document.getElementById('locFilterInfoModal').classList.add('open');
 }
 function closeLocFilterInfoModal() {
@@ -2405,6 +2456,7 @@ function renderProg() {
   progRidsByName = {};
   updateLocFilter();
   updateProgGenreChips();
+  updateProgFiltersActiveIndicator();
   if (!allProgEntries().length) {
     list.innerHTML = `<div class="prog-empty"><div class="icon">📅</div>Noch keine Auftrittsdaten hinterlegt.</div>`;
     updateProgTotalTime();
