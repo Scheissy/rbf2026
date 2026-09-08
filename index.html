@@ -1021,6 +1021,43 @@ function splitTags(val) {
   return (val || '').split('/').map(s => s.trim()).filter(Boolean);
 }
 
+// Gängige deutsche Ländernamen -> etablierte Abkürzung (Kfz-Länderkennzeichen
+// bzw. ISO 3166-1), für die platzsparende Herkunfts-Anzeige in der Künstler-
+// Übersicht auf dem Handy. Unbekannte Werte (inkl. bereits abgekürzter Codes
+// wie "DE") bleiben unverändert - diese Liste deckt bewusst nur gängige
+// Herkunftsländer ab, keine vollständige Länderliste.
+const COUNTRY_ABBREVIATIONS = {
+  'Deutschland': 'DE', 'Österreich': 'AT', 'Schweiz': 'CH',
+  'Vereinigtes Königreich': 'UK', 'Großbritannien': 'UK', 'England': 'UK',
+  'Vereinigte Staaten': 'USA', 'Vereinigte Staaten von Amerika': 'USA',
+  'Frankreich': 'FR', 'Niederlande': 'NL', 'Belgien': 'BE', 'Dänemark': 'DK',
+  'Schweden': 'SE', 'Norwegen': 'NO', 'Finnland': 'FI', 'Island': 'IS',
+  'Polen': 'PL', 'Tschechien': 'CZ', 'Tschechische Republik': 'CZ',
+  'Slowakei': 'SK', 'Ungarn': 'HU', 'Italien': 'IT', 'Spanien': 'ES',
+  'Portugal': 'PT', 'Griechenland': 'GR', 'Irland': 'IE', 'Kanada': 'CA',
+  'Australien': 'AU', 'Neuseeland': 'NZ', 'Japan': 'JP', 'Südkorea': 'KR',
+  'Brasilien': 'BR', 'Mexiko': 'MX', 'Argentinien': 'AR', 'Südafrika': 'ZA',
+  'Russland': 'RU', 'Ukraine': 'UA', 'Rumänien': 'RO', 'Bulgarien': 'BG',
+  'Kroatien': 'HR', 'Slowenien': 'SI', 'Serbien': 'RS', 'Litauen': 'LT',
+  'Lettland': 'LV', 'Estland': 'EE', 'Türkei': 'TR', 'Israel': 'IL',
+  'Indien': 'IN', 'China': 'CN'
+};
+
+// Kürzt NUR den Länderanteil eines Herkunft-Werts ("Stadt, Land" oder nur
+// "Land") für die Anzeige - der zugrunde liegende dataMap-Wert bleibt
+// unangetastet, daher greifen Suche/Filter weiterhin auf den vollen Namen.
+// Bewusst nur in der Künstler-Übersicht verwendet (dort ist auf dem Handy
+// wenig Platz); in der Programm-Übersicht bleibt der volle Name stehen.
+function shortenHerkunft(herkunft) {
+  if (!herkunft) return herkunft;
+  const idx = herkunft.lastIndexOf(',');
+  if (idx === -1) return COUNTRY_ABBREVIATIONS[herkunft.trim()] || herkunft;
+  const city = herkunft.slice(0, idx).trim();
+  const country = herkunft.slice(idx + 1).trim();
+  const abbr = COUNTRY_ABBREVIATIONS[country];
+  return abbr ? `${city}, ${abbr}` : herkunft;
+}
+
 // Normalisiert einen String für die Suche: Kleinschreibung + Entfernung von
 // Akzenten/diakritischen Zeichen (é/è/ê -> e, ü -> u, ñ -> n, ...), damit eine
 // Suche nach "Dov'e Liana" auch "Dov'è Liana" findet - nicht nur für dieses
@@ -1071,7 +1108,7 @@ function updateTagFilters() {
   const herkunftSel = document.getElementById('fHerkunft');
   const curHerkunft = herkunftSel.value;
   herkunftSel.innerHTML = `<option value="">Alle Herkünfte</option>` +
-    [...herkunftSet].sort((a, b) => a.localeCompare(b, 'de')).map(h => `<option value="${h}"${h === curHerkunft ? ' selected' : ''}>${h}</option>`).join('');
+    [...herkunftSet].sort((a, b) => a.localeCompare(b, 'de')).map(h => `<option value="${h}"${h === curHerkunft ? ' selected' : ''}>${shortenHerkunft(h)}</option>`).join('');
   // Soundreferenz-Filter: Optionsliste kommt direkt aus SOUND_REFERENCES
   // (rbf-data.js), nicht aus dataMap - die Liste wächst unabhängig von den
   // Künstlerdaten selbst, daher hier bewusst eine eigene, dynamische
@@ -1685,7 +1722,7 @@ function renderArtistItem(name) {
     ${soundRefIconHTML(name)}
     ${d.ausgeblendet ? '<span class="badge b-hidden">🙈</span>' : ''}
     ${d.reinhoeren ? '<span class="badge b-reinhoeren">🎧</span>' : ''}
-    <div class="artist-country">${d.herkunft}</div>
+    <div class="artist-country">${shortenHerkunft(d.herkunft)}</div>
     <div class="badge ${gc}">${d.geschlecht}</div>
   </div>`;
   if (isExp) {
