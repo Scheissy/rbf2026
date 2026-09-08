@@ -503,11 +503,11 @@ input[type=file] { display: none; }
         <input type="checkbox" id="fProgPlanned" onchange="renderProg()">
         🎯 Nur als Ziel markierte
       </label>
-      <label class="prog-hidden-toggle">
+      <label class="prog-hidden-toggle" id="rowShowMusicEvents">
         <input type="checkbox" id="settingShowMusicEvents" checked onchange="toggleSetting('showMusicEvents', this.checked)">
         🎵 Musik-Events anzeigen
       </label>
-      <label class="prog-hidden-toggle">
+      <label class="prog-hidden-toggle" id="rowShowOtherEvents">
         <input type="checkbox" id="settingShowOtherEvents" checked onchange="toggleSetting('showOtherEvents', this.checked)">
         🎪 Sonstige Events anzeigen
       </label>
@@ -557,6 +557,13 @@ input[type=file] { display: none; }
           <div class="settings-toggle-desc">Filter-Einstellungen (Künstler- & Programm-Übersicht) über Neustarts hinweg merken</div>
         </div>
         <input type="checkbox" id="settingPersistFilters" checked onchange="toggleSetting('persistFilters', this.checked)">
+      </label>
+      <label class="settings-toggle-row">
+        <div class="settings-toggle-text">
+          <div class="settings-toggle-label">🎪 RBF-Sonderveranstaltungen</div>
+          <div class="settings-toggle-desc">Award-Shows, Talks & Co. in der Programm-Übersicht (inkl. der beiden Event-Filter) anzeigen</div>
+        </div>
+        <input type="checkbox" id="settingShowRbfEvents" checked onchange="toggleSetting('showRbfEvents', this.checked)">
       </label>
     </div>
 
@@ -774,7 +781,7 @@ let statsAusgeblendetFilter = false;
 // lebt jetzt rein hier, gesetzt/zurückgesetzt über filterByStat().
 let kuenstlerSeenFilter = '';
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
-let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true, showMusicEvents: true, showOtherEvents: true, progFiltersExpanded: false };
+let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true, showMusicEvents: true, showOtherEvents: true, progFiltersExpanded: false, showRbfEvents: true };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
 let selectedLocs = new Set(); // Mehrfachauswahl im Location-Filter der Programm-Übersicht (leer = alle)
 // Eigener Genre-Mehrfachfilter für die Programm-Übersicht - analog zum
@@ -1367,6 +1374,11 @@ function getFilteredAuftritte() {
   const plannedOnly = document.getElementById('fProgPlanned').checked;
   return allProgEntries().filter(a => {
     if (!days.includes(a.day)) return false;
+    // Globaler Settings-Schalter (Settings-Tab): Sonderveranstaltungen komplett
+    // aus der Programm-Übersicht ausblenden, unabhängig von den beiden
+    // Musik-/Sonstige-Events-Checkboxen darunter (die regeln nur die
+    // Feinauswahl, wenn Events grundsätzlich angezeigt werden).
+    if (a.isEvent && !appSettings.showRbfEvents) return false;
     // Persistente Locations-Verwaltung (Settings): komplett ausgeblendete
     // Locations gelten immer, unabhängig vom temporären Location-Filter oben
     // - bewusst NICHT Teil von "Filter zurücksetzen", da es sich eher um eine
@@ -1889,6 +1901,9 @@ function toggleSetting(key, val) {
     // inzwischen veralteten Stand wiederherstellen.
     try { localStorage.removeItem(LS_FILTERS_KEY); } catch (e) { safeLog('Konnte Filter-Persistenz nicht löschen:', e); }
   }
+  if (key === 'showRbfEvents') {
+    updateRbfEventsVisibility();
+  }
   saveToStorage();
   render();
   if (currentTab === 'programm') renderProg();
@@ -1901,8 +1916,24 @@ function applySettingsUI() {
   document.getElementById('settingPersistFilters').checked = appSettings.persistFilters;
   document.getElementById('settingShowMusicEvents').checked = appSettings.showMusicEvents;
   document.getElementById('settingShowOtherEvents').checked = appSettings.showOtherEvents;
+  document.getElementById('settingShowRbfEvents').checked = appSettings.showRbfEvents;
   updateSoundRefFilterVisibility();
   updateProgFiltersPanelVisibility();
+  updateRbfEventsVisibility();
+}
+
+// Blendet die beiden Musik-/Sonstige-Events-Checkboxen im "Weitere Filter"-
+// Panel der Programm-Übersicht ein bzw. aus, je nach globalem Settings-
+// Schalter "RBF-Sonderveranstaltungen". Die eigentliche Ausblendung der
+// Events selbst passiert in getFilteredAuftritte() (appSettings.showRbfEvents) -
+// hier geht es nur um die Sichtbarkeit der beiden zugehörigen Checkbox-Zeilen,
+// die bei ausgeschaltetem Schalter keinen Sinn mehr ergeben.
+function updateRbfEventsVisibility() {
+  const musicRow = document.getElementById('rowShowMusicEvents');
+  const otherRow = document.getElementById('rowShowOtherEvents');
+  const show = appSettings.showRbfEvents;
+  if (musicRow) musicRow.style.display = show ? 'flex' : 'none';
+  if (otherRow) otherRow.style.display = show ? 'flex' : 'none';
 }
 
 // Ein-/Ausklappen des selten genutzten unteren Teils der Programm-Filter
