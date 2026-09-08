@@ -322,7 +322,7 @@ input[type=file] { display: none; }
     </div>
     <div class="modal-body" style="font-size:14px;line-height:1.5">
       <p style="margin:0 0 10px">Springt auf den aktuellen Festivaltag und die aktuelle Uhrzeit.</p>
-      <p style="margin:0 0 10px"><b>1. Tippen:</b> Nur Tag und Uhrzeit werden angepasst - alle anderen Filter (Location, Bewertungen, Status, Dauer, Ziel) bleiben unverändert.</p>
+      <p style="margin:0 0 10px"><b>1. Tippen:</b> Nur Tag und Uhrzeit werden angepasst - alle anderen Filter (Location, Genre, Bewertungen, Status, Dauer, Ziel) bleiben unverändert.</p>
       <p style="margin:0">Steht man bereits auf der aktuellen Zeit, setzt ein <b>weiteres Tippen</b> zusätzlich diese übrigen Filter zurück. „Ausgeblendete anzeigen" sowie die Musik-/Sonstige-Events-Anzeige bleiben dabei immer unangetastet.</p>
       <p style="margin:10px 0 0;padding-top:10px;border-top:1px solid var(--border);color:var(--text2);font-size:13px">Unterschied zu „Filter zurücksetzen": das springt immer auf den heutigen Tag (inkl. aller kommenden Tage) und setzt alle übrigen Filter sofort zurück - ohne Rücksicht auf die aktuelle Uhrzeit.</p>
     </div>
@@ -364,6 +364,20 @@ input[type=file] { display: none; }
     <div class="modal-footer">
       <button class="form-btn form-btn-cancel" onclick="resetLocFilter()">Zurücksetzen</button>
       <button class="form-btn form-btn-save" onclick="closeLocModal()">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="progGenreModal" onclick="handleProgGenreBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Genres filtern</div>
+      <button class="modal-close" onclick="closeProgGenreModal()">✕</button>
+    </div>
+    <div class="modal-body" id="progGenreModalList" style="gap:0"></div>
+    <div class="modal-footer">
+      <button class="form-btn form-btn-cancel" onclick="resetProgGenreFilter()">Zurücksetzen</button>
+      <button class="form-btn form-btn-save" onclick="closeProgGenreModal()">Fertig</button>
     </div>
   </div>
 </div>
@@ -469,6 +483,8 @@ input[type=file] { display: none; }
           <div class="stars stars-sm" id="fProgShowRatingStars"></div>
         </div>
       </div>
+      <button class="filter genre-filter-btn" id="progGenreFilterBtn" onclick="openProgGenreModal()" style="width:100%">🎵 Alle Genres</button>
+      <div class="filter-chips" id="progGenreChips" style="display:none"></div>
       <div class="prog-row2">
         <select id="fProgStatus" onchange="renderProg()">
           <option value="">Alle Status</option>
@@ -755,6 +771,12 @@ let kuenstlerSeenFilter = '';
 let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true, showMusicEvents: true, showOtherEvents: true, progFiltersExpanded: false };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
 let selectedLocs = new Set(); // Mehrfachauswahl im Location-Filter der Programm-Übersicht (leer = alle)
+// Eigener Genre-Mehrfachfilter für die Programm-Übersicht - analog zum
+// Genre-Filter der Künstler-Übersicht (gleiches UI-Muster über
+// makeMultiSelectFilter), aber bewusst mit eigenem Auswahl-Zustand statt
+// geteilt mit "selectedGenres", damit die beiden Tabs sich nicht gegenseitig
+// beeinflussen (genau wie der Location-Filter, der auch nur im Programm-Tab existiert).
+let progSelectedGenres = new Set();
 let locFilterOptions = []; // aktuell (nach Tag/Uhrzeit) verfügbare Locations fürs Modal
 let allGenreTags = []; // aktuell vorkommende Genre-Tags, alphabetisch sortiert
 
@@ -850,6 +872,7 @@ function saveFilterState() {
       timeFrom: document.getElementById('timeFrom').value,
       timeTo: document.getElementById('timeTo').value,
       selectedLocs: [...selectedLocs],
+      progSelectedGenres: [...progSelectedGenres],
       progRatingFilter,
       progShowRatingFilter,
       fProgStatus: document.getElementById('fProgStatus').value,
@@ -890,6 +913,7 @@ function loadFilterState() {
     if (typeof s.timeFrom === 'string') document.getElementById('timeFrom').value = s.timeFrom;
     if (typeof s.timeTo === 'string') document.getElementById('timeTo').value = s.timeTo;
     if (Array.isArray(s.selectedLocs)) s.selectedLocs.forEach(l => selectedLocs.add(l));
+    if (Array.isArray(s.progSelectedGenres)) s.progSelectedGenres.forEach(g => progSelectedGenres.add(g));
     if (typeof s.progRatingFilter === 'number') progRatingFilter = s.progRatingFilter;
     if (typeof s.progShowRatingFilter === 'number') progShowRatingFilter = s.progShowRatingFilter;
     if (typeof s.fProgStatus === 'string') document.getElementById('fProgStatus').value = s.fProgStatus;
@@ -1353,6 +1377,10 @@ function getFilteredAuftritte() {
       if (toVal && timeSortValue(a.time) > timeSortValue(toVal)) return false;
     }
     if (minRating > 0 && avgRating(d) < minRating) return false;
+    // Events haben kein Genre (nur Künstler-Auftritte) - bei aktivem Filter
+    // fallen sie damit konsequent raus, genau wie sie es bei den anderen
+    // künstler-spezifischen Filtern (Bewertung, Status) oben bereits tun.
+    if (progSelectedGenres.size > 0 && (!d || !splitTags(d.genre).some(g => progSelectedGenres.has(g)))) return false;
     if (progShowRatingFilter > 0 && (showRatings[showKey(a)] || 0) < progShowRatingFilter) return false;
     if (statusVal === 'ja' && d?.gesehen !== 'ja') return false;
     if (statusVal === 'bekannt' && d?.gesehen !== 'bekannt' && d?.gesehen !== 'ja') return false; // "gesehen" ist immer auch "bekannt"
@@ -2071,6 +2099,8 @@ function resetProgFilters() {
   document.getElementById('timeFrom').value = '08:00';
   document.getElementById('timeTo').value = '';
   selectedLocs.clear();
+  progSelectedGenres.clear();
+  updateProgGenreChips();
   document.getElementById('fProgStatus').value = '';
   document.getElementById('fProgDuration').checked = false;
   document.getElementById('fProgPlanned').checked = false;
@@ -2090,7 +2120,7 @@ function resetProgFilters() {
 // verliert, nur weil man kurz zu "jetzt" springen will). Steht man bereits
 // auf Tag+Zeit von "jetzt" (= 2. Klick direkt hintereinander, oder man war
 // eh schon da), setzt der Klick zusätzlich die übrigen Programm-Filter
-// zurück (Location, Bewertungen, Status, Dauer, Ziel) - bewusst OHNE
+// zurück (Location, Genre, Bewertungen, Status, Dauer, Ziel) - bewusst OHNE
 // "Ausgeblendete anzeigen" und OHNE die beiden Event-Sichtbarkeits-Haken
 // (Musik-/Sonstige Events anzeigen), das sind Dauereinstellungen, keine
 // Programm-Filter im engeren Sinn.
@@ -2111,6 +2141,8 @@ function jumpToNow() {
 
   if (alreadyAtNow) {
     selectedLocs.clear();
+    progSelectedGenres.clear();
+    updateProgGenreChips();
     document.getElementById('fProgStatus').value = '';
     document.getElementById('fProgDuration').checked = false;
     document.getElementById('fProgPlanned').checked = false;
@@ -2209,6 +2241,29 @@ function updateLocChips() { locModalApi.updateChips(); }
 function openLocModal() { locModalApi.open(); }
 function closeLocModal() { locModalApi.close(); }
 function handleLocBackdropClick(e) { locModalApi.handleBackdrop(e); }
+
+// ── GENRE-MEHRFACHFILTER (Programm-Übersicht) ───────────────────────────────
+// Nutzt dieselbe globale Genre-Liste (allGenreTags) wie der Künstler-Tab,
+// da sich Genres nicht nach Tag/Uhrzeit richten (anders als Locations) - nur
+// die Auswahl selbst (progSelectedGenres) ist eigenständig.
+const progGenreModalApi = makeMultiSelectFilter({
+  getOptions: () => allGenreTags,
+  selected: progSelectedGenres,
+  modalListId: 'progGenreModalList', modalId: 'progGenreModal', chipsId: 'progGenreChips', btnId: 'progGenreFilterBtn',
+  emptyLabel: 'Keine Genres vorhanden.',
+  allLabel: '🎵 Alle Genres',
+  countLabel: n => `🎵 Genre (${n})`,
+  toggleFnName: 'toggleProgGenreSelection', removeChipFnName: 'removeProgGenreChip', resetFnName: 'resetProgGenreFilter',
+  onChange: () => renderProg()
+});
+function renderProgGenreModalList() { progGenreModalApi.render(); }
+function toggleProgGenreSelection(g) { progGenreModalApi.toggle(g); }
+function removeProgGenreChip(g) { progGenreModalApi.removeChip(g); }
+function resetProgGenreFilter() { progGenreModalApi.reset(); }
+function updateProgGenreChips() { progGenreModalApi.updateChips(); }
+function openProgGenreModal() { progGenreModalApi.open(); }
+function closeProgGenreModal() { progGenreModalApi.close(); }
+function handleProgGenreBackdropClick(e) { progGenreModalApi.handleBackdrop(e); }
 
 // ── LOCATIONS VERWALTEN (Settings) ─────────────────────────────────────────────
 // Persistente, geräteweite Anzeige-Einstellung: welche Locations sollen in der
@@ -2349,6 +2404,7 @@ function renderProg() {
   openProgRid = null;
   progRidsByName = {};
   updateLocFilter();
+  updateProgGenreChips();
   if (!allProgEntries().length) {
     list.innerHTML = `<div class="prog-empty"><div class="icon">📅</div>Noch keine Auftrittsdaten hinterlegt.</div>`;
     updateProgTotalTime();
