@@ -1021,7 +1021,16 @@ function splitTags(val) {
   return (val || '').split('/').map(s => s.trim()).filter(Boolean);
 }
 
-// Gängige deutsche Ländernamen -> etablierte Abkürzung (Kfz-Länderkennzeichen
+// Kurzformen für die Geschlecht-Badge in der Künstler-Übersicht: "m" allein
+// wäre zwischen "männlich" und "mixed" mehrdeutig, daher bewusst "mix" statt
+// "m" für gemischte Formationen. Die unterschiedliche Badge-Farbe
+// (genderBadgeClass) unterscheidet die vier Fälle zusätzlich voneinander.
+// Analog zu shortenHerkunft() nur für die Künstler-Übersicht gedacht - in
+// der Programm-Übersicht bleibt der volle Wert stehen.
+const GESCHLECHT_ABBREVIATIONS = { 'weiblich': 'w', 'männlich': 'm', 'divers': 'd', 'mixed': 'mix' };
+function shortenGeschlecht(geschlecht) {
+  return GESCHLECHT_ABBREVIATIONS[geschlecht] || geschlecht;
+}
 // bzw. ISO 3166-1), für die platzsparende Herkunfts-Anzeige in der Künstler-
 // Übersicht auf dem Handy. Unbekannte Werte (inkl. bereits abgekürzter Codes
 // wie "DE") bleiben unverändert - diese Liste deckt bewusst nur gängige
@@ -1723,7 +1732,7 @@ function renderArtistItem(name) {
     ${d.ausgeblendet ? '<span class="badge b-hidden">🙈</span>' : ''}
     ${d.reinhoeren ? '<span class="badge b-reinhoeren">🎧</span>' : ''}
     <div class="artist-country">${shortenHerkunft(d.herkunft)}</div>
-    <div class="badge ${gc}">${d.geschlecht}</div>
+    <div class="badge ${gc}" title="${d.geschlecht}">${shortenGeschlecht(d.geschlecht)}</div>
   </div>`;
   if (isExp) {
     let showsHtml = '';
