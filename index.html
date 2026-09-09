@@ -1055,16 +1055,20 @@ const COUNTRY_ABBREVIATIONS = {
 // Kürzt NUR den Länderanteil eines Herkunft-Werts ("Stadt, Land" oder nur
 // "Land") für die Anzeige - der zugrunde liegende dataMap-Wert bleibt
 // unangetastet, daher greifen Suche/Filter weiterhin auf den vollen Namen.
+// Zusammengesetzte Länder (z.B. "Deutschland / Australien" bei Acts mit
+// mehreren Herkunftsländern) werden über splitTags() einzeln aufgeteilt und
+// jedes Land für sich abgekürzt - gerade dort bringt eine Kürzung am meisten,
+// da diese Fälle sonst besonders lang werden.
 // Bewusst nur in der Künstler-Übersicht verwendet (dort ist auf dem Handy
 // wenig Platz); in der Programm-Übersicht bleibt der volle Name stehen.
 function shortenHerkunft(herkunft) {
   if (!herkunft) return herkunft;
+  const abbreviateCountryPart = part => splitTags(part).map(c => COUNTRY_ABBREVIATIONS[c] || c).join(' / ');
   const idx = herkunft.lastIndexOf(',');
-  if (idx === -1) return COUNTRY_ABBREVIATIONS[herkunft.trim()] || herkunft;
+  if (idx === -1) return abbreviateCountryPart(herkunft);
   const city = herkunft.slice(0, idx).trim();
   const country = herkunft.slice(idx + 1).trim();
-  const abbr = COUNTRY_ABBREVIATIONS[country];
-  return abbr ? `${city}, ${abbr}` : herkunft;
+  return `${city}, ${abbreviateCountryPart(country)}`;
 }
 
 // Normalisiert einen String für die Suche: Kleinschreibung + Entfernung von
