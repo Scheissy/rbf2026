@@ -24,15 +24,17 @@ mit der Zeit ihren Nutzen.
 | `test_reset_past_days.js` | "Filter zurücksetzen" blendet vergangene Festivaltage aus (Mi/Do/Fr/Sa-Fälle, Nachteulen-Puffer, vor/nach dem Festival). |
 | `test_reset_time_independence.js` | "Filter zurücksetzen" liefert am selben Tag unabhängig von der Uhrzeit immer denselben Zustand. |
 | `test_special_char_rating_bug.js` | Regressionstest für den Escaping-Bug bei Künstlernamen mit Apostroph (Bewertung + "Gesehen" in der Programm-Übersicht). |
+| `test_rename_rescue.js` | Case-insensitive Rettung von Bewertung/Gesehen-Status bei reiner Schreibweisen-Änderung eines Künstlernamens (z.B. "Meller" -> "MELLER"), inkl. Sicherheits-Bremse bei Mehrdeutigkeit. |
 | `test_country_abbreviation.js` | `shortenHerkunft()`: Länder-Abkürzungen (inkl. zusammengesetzter Länder mit "/"), nur in der Künstler-, nicht in der Programm-Übersicht. Nutzt eine EIGENE, kleine Testdatendatei (volle Ländernamen) statt `rbf-data.test.js`. |
 | `test_gender_abbreviation.js` | `shortenGeschlecht()`: Kollisionsfreie Kurzformen (w/m/d/mix), nur in der Künstler-Übersicht. |
 
 ## Hilfsdateien
 
 - `test-helpers.js` - gemeinsame Helfer (`loadApp()`, `reloadWithState()`,
-  `createChecker()`). Bisher nicht von den Dateien oben genutzt (die haben
-  ihr JSDOM-Setup jeweils noch selbst eingebaut) - gedacht für eine
-  schrittweise Migration, siehe Kommentar am Kopf der Datei.
+  `createChecker()`). Alle 16 Testdateien oben nutzen diese Helfer bereits
+  (Migration in 8 Runden abgeschlossen) - Boilerplate wurde dabei um
+  durchschnittlich ca. 43 % pro Datei reduziert, die eigentliche Prüf-Logik
+  blieb inhaltlich unverändert.
 - `run-tests.sh` - führt alle (oder gezielt einzelne) `test_*.js` aus.
 - `rbf-data.test.js` - gemeinsame Testdatendatei, deckt bewusst mehrere
   Sonderfälle ab (siehe Kommentar am Kopf der Datei selbst).

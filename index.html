@@ -820,21 +820,43 @@ function loadFromStorage() {
     if (!raw) return;
     const data = JSON.parse(raw);
     if (data.ratings) {
+      // Case-insensitive Fallback-Suche: wird nur gebraucht, wenn sich NUR die
+      // Groß-/Kleinschreibung eines Namens geändert hat (z.B. "Meller" ->
+      // "MELLER" in einem rbf-data.js-Update). dataMap wird bei jedem Start
+      // komplett neu aus den aktuellen Daten aufgebaut - ein gespeicherter
+      // Eintrag mit dem ALTEN Namen fände sonst keinen exakten Treffer mehr
+      // und Bewertung/Gesehen-Status würden beim nächsten Speichern
+      // stillschweigend verloren gehen. Nur bei GENAU einem Treffer greifen -
+      // bei mehreren möglichen Kandidaten lieber nichts automatisch
+      // zuordnen, als eventuell den falschen Künstler zu treffen.
+      const lowerCaseIndex = new Map();
+      Object.keys(dataMap).forEach(name => {
+        const key = name.toLowerCase();
+        lowerCaseIndex.set(key, (lowerCaseIndex.get(key) || 0) + 1 === 1 ? name : null);
+      });
       data.ratings.forEach(r => {
-        // restore manual artists that aren't in RAW
-        if (!dataMap[r.n] && r.manual) {
-          dataMap[r.n] = { name:r.n, genre:r.genre||'', herkunft:r.herkunft||'', geschlecht:r.geschlecht||'mixed', rbfUrl:r.rbfUrl||'', rp:0, rl:0, gesehen:'', customUrl:'', manual:true, edited:false, ausgeblendet:false, kommentar:'', reinhoeren:false };
+        let targetName = r.n;
+        if (!dataMap[targetName] && !r.manual) {
+          const match = lowerCaseIndex.get((r.n || '').toLowerCase());
+          if (match) {
+            safeLog(`Künstlername "${r.n}" nicht mehr gefunden, aber eindeutige Schreibweisen-Änderung erkannt -> Bewertung/Status auf "${match}" übertragen.`);
+            targetName = match;
+          }
         }
-        if (dataMap[r.n]) {
-          dataMap[r.n].rp = Math.min(r.rp || 0, MAX);
-          dataMap[r.n].rl = Math.min(r.rl || 0, MAX);
-          dataMap[r.n].gesehen = r.s || '';
-          dataMap[r.n].customUrl = r.u || '';
-          dataMap[r.n].manual = r.manual || false;
-          dataMap[r.n].edited = r.edited || false;
-          dataMap[r.n].ausgeblendet = r.h || false;
-          dataMap[r.n].kommentar = (r.c || '').slice(0, MAX_COMMENT_LEN);
-          dataMap[r.n].reinhoeren = r.rh || false;
+        // restore manual artists that aren't in RAW
+        if (!dataMap[targetName] && r.manual) {
+          dataMap[targetName] = { name:targetName, genre:r.genre||'', herkunft:r.herkunft||'', geschlecht:r.geschlecht||'mixed', rbfUrl:r.rbfUrl||'', rp:0, rl:0, gesehen:'', customUrl:'', manual:true, edited:false, ausgeblendet:false, kommentar:'', reinhoeren:false };
+        }
+        if (dataMap[targetName]) {
+          dataMap[targetName].rp = Math.min(r.rp || 0, MAX);
+          dataMap[targetName].rl = Math.min(r.rl || 0, MAX);
+          dataMap[targetName].gesehen = r.s || '';
+          dataMap[targetName].customUrl = r.u || '';
+          dataMap[targetName].manual = r.manual || false;
+          dataMap[targetName].edited = r.edited || false;
+          dataMap[targetName].ausgeblendet = r.h || false;
+          dataMap[targetName].kommentar = (r.c || '').slice(0, MAX_COMMENT_LEN);
+          dataMap[targetName].reinhoeren = r.rh || false;
         }
       });
     }

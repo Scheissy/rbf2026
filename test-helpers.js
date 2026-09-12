@@ -109,6 +109,11 @@ async function reloadWithState(sourceWindow, storageKeys, opts = {}) {
   // den zur übergebenen Key-Liste passenden.
   if (typeof fresh.window.loadFromStorage === 'function') fresh.window.loadFromStorage();
   if (typeof fresh.window.loadFilterState === 'function') fresh.window.loadFilterState();
+  // applySettingsUI() synchronisiert die Checkbox-DOM-Elemente (z.B.
+  // #settingShowRbfEvents) mit den gerade geladenen appSettings-Werten -
+  // ohne diesen Aufruf würden die Checkboxen weiterhin ihren ALTEN
+  // (Default-)Zustand von der Konstruktion der frischen Instanz zeigen.
+  if (typeof fresh.window.applySettingsUI === 'function') fresh.window.applySettingsUI();
   return fresh;
 }
 
