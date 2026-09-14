@@ -17,18 +17,21 @@ const { loadApp, createChecker } = require('./test-helpers');
   d.getElementById('timeFrom').value = '08:00';
 
   // 1. Klick: nur Tag+Zeit sollen sich ändern, Status-Filter bleibt erhalten.
+  // "Heute" ist Do 17.09 -> aktiviert werden Do+Fr+Sa (heute + kommende Tage,
+  // Mi ist vorbei) - analog zu resetProgFilters()/applySmartProgDefaults().
   w.jumpToNow();
-  const dayOk1 = [...d.querySelectorAll('.day-btn')].every(b => b.classList.contains('active') === (b.dataset.day === 'Do 17.09'));
+  const expectedDays = ['Do 17.09', 'Fr 18.09', 'Sa 19.09'];
+  const dayOk1 = [...d.querySelectorAll('.day-btn')].every(b => b.classList.contains('active') === expectedDays.includes(b.dataset.day));
   const timeOk1 = d.getElementById('timeFrom').value === '13:00';
   const statusUnchanged1 = d.getElementById('fProgStatus').value === 'ja';
-  t.check('1. Klick setzt Tag/Zeit korrekt auf "jetzt".', dayOk1 && timeOk1, { dayOk1, timeOk1, timeFrom: d.getElementById('timeFrom').value });
+  t.check('1. Klick setzt Tag/Zeit korrekt auf "jetzt" (heute + kommende Tage).', dayOk1 && timeOk1, { dayOk1, timeOk1, timeFrom: d.getElementById('timeFrom').value });
   t.check('1. Klick lässt den Status-Filter unangetastet.', statusUnchanged1);
 
   // 2. Klick (wir stehen bereits auf Tag/Zeit von "jetzt"): jetzt sollen die
   // übrigen Filter zusätzlich zurückgesetzt werden.
   w.jumpToNow();
   const statusReset = d.getElementById('fProgStatus').value === '';
-  const dayOk2 = [...d.querySelectorAll('.day-btn')].every(b => b.classList.contains('active') === (b.dataset.day === 'Do 17.09'));
+  const dayOk2 = [...d.querySelectorAll('.day-btn')].every(b => b.classList.contains('active') === expectedDays.includes(b.dataset.day));
   const timeOk2 = d.getElementById('timeFrom').value === '13:00';
   t.check('2. Klick (bereits auf "jetzt") setzt den Status-Filter zusätzlich zurück.', statusReset);
   t.check('Tag/Zeit bleiben beim 2. Klick weiterhin korrekt auf "jetzt".', dayOk2 && timeOk2);

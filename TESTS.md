@@ -15,7 +15,8 @@ mit der Zeit ihren Nutzen.
 | `test_filters_collapse.js` | Ein-/Ausklappen des "Weitere Filter"-Bereichs in der Programm-Übersicht; Persistenz des Auf-/Zu-Zustands. |
 | `test_hidden_events.js` | Ausblenden einzelner Sonderveranstaltungen (🙈), inkl. Regressionscheck der Event-URL-Verlinkung. |
 | `test_jump_info_modal.js` | ⓘ-Erklärungs-Modal für den zweistufigen "Jetzt"-Button. |
-| `test_jump_to_now.js` | Zweistufiges "Jetzt"-Verhalten: 1. Klick nur Zeit, 2. Klick zusätzlich Reset der übrigen Filter. |
+| `test_jump_to_now.js` | Zweistufiges "Jetzt"-Verhalten: 1. Klick nur Zeit+Tage (heute + kommende), 2. Klick zusätzlich Reset der übrigen Filter. |
+| `test_jump_to_now_future_scroll.js` | "Jetzt" lässt freies Scrollen in die Zukunft zu: keine Endzeit gesetzt, künftige Tage bleiben aktiv (nicht nur der heutige Tag). |
 | `test_loc_info_modal.js` | ⓘ-Erklärungs-Modal beim Location-Filter (Hinweis auf "Locations verwalten" + Anzeige der aktuell ausgewählten Locations). |
 | `test_prog_filters_indicator.js` | Aktiv-Punkt am "Weitere Filter"-Button (erscheint nur bei eingeklapptem Panel + aktivem "versteckten" Filter, Event-Checkboxen bewusst ausgenommen). |
 | `test_prog_genre_filter.js` | Genre-Mehrfachfilter in der Programm-Übersicht (UI, Filterwirkung, Persistenz, Zurücksetzen, Unabhängigkeit vom Künstler-Tab). |

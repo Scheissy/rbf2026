@@ -2258,6 +2258,11 @@ function resetProgFilters() {
 // Springt auf den heutigen Festivaltag (falls es einer ist) und die aktuelle
 // Uhrzeit minus Puffer (mind. 30 Min, siehe getFestivalContext), damit gerade
 // laufende Shows nicht rausgefiltert werden.
+// Tage: bewusst "heute + alle kommenden Tage" aktivieren (wie bei
+// resetProgFilters()/applySmartProgDefaults(), siehe getPastFestivalDays()),
+// NICHT nur der heutige Tag - zusammen mit der ohnehin fehlenden Endzeit
+// (timeTo bleibt leer) kann man so direkt beliebig weit in die Zukunft
+// scrollen, ohne die Tages-Auswahl manuell nachjustieren zu müssen.
 // Zweistufiges Verhalten: 1. Klick passt NUR Tag+Zeit an (übrige Filter
 // bleiben erhalten, damit man z.B. einen gesetzten Bewertungsfilter nicht
 // verliert, nur weil man kurz zu "jetzt" springen will). Steht man bereits
@@ -2271,14 +2276,15 @@ function jumpToNow() {
   const ctx = getFestivalContext();
   if (!ctx) { toast('Heute ist kein Festivaltag', false); return; }
 
+  const pastDays = getPastFestivalDays();
   const dayBtns = [...document.querySelectorAll('.day-btn')];
   const fromSel = document.getElementById('timeFrom');
   const toSel = document.getElementById('timeTo');
-  const alreadyAtNow = dayBtns.every(b => b.classList.contains('active') === (b.dataset.day === ctx.day))
+  const alreadyAtNow = dayBtns.every(b => b.classList.contains('active') === !pastDays.has(b.dataset.day))
     && fromSel.value === ctx.time
     && toSel.value === '';
 
-  dayBtns.forEach(b => b.classList.toggle('active', b.dataset.day === ctx.day));
+  dayBtns.forEach(b => b.classList.toggle('active', !pastDays.has(b.dataset.day)));
   if ([...fromSel.options].some(o => o.value === ctx.time)) fromSel.value = ctx.time;
   toSel.value = '';
 
