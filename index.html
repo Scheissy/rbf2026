@@ -2147,7 +2147,7 @@ function setKuenstlerAvgFilter(n) {
 // Erkennt, ob "heute" (in der Festival-Zeitzone Europe/Berlin, NICHT der
 // Geräte-Zeitzone) einer der 4 Festivaltage ist, und liefert dafür den
 // passenden Tag-Filterwert sowie eine sinnvolle Start-Uhrzeit (aktuelle Zeit
-// minus 1h, abgerundet auf den nächsten 30-Min-Slot). Nutzt bewusst explizit
+// minus 30 Min, abgerundet auf den nächsten 30-Min-Slot). Nutzt bewusst explizit
 // Europe/Berlin statt new Date()/getHours() etc., damit das auch dann korrekt
 // bleibt, wenn das Gerät auf eine andere Zeitzone eingestellt ist (z.B. nach
 // einer Reise vergessen umzustellen).
@@ -2186,7 +2186,9 @@ function getFestivalContext() {
   const day = FESTIVAL_DAYS[key];
   if (!day) return null;
 
-  let totalMin = now.hour * 60 + now.minute - 60; // minus 1 Stunde
+  let totalMin = now.hour * 60 + now.minute - 30; // minus 30 Min Puffer (früher 1h - erwies
+  // sich in der Praxis gerade zu Hauptzeiten als zu großzügig, zeigte dann zu viele
+  // bereits/kurz vor Beginn laufende Shows gleichzeitig an)
   totalMin = ((totalMin % 1440) + 1440) % 1440; // sauberer Wrap über Mitternacht
   totalMin = Math.floor(totalMin / 30) * 30; // auf 30-Min-Slot abrunden
   let hh = Math.floor(totalMin / 60), mm = totalMin % 60;
@@ -2256,7 +2258,7 @@ function resetProgFilters() {
 }
 
 // Springt auf den heutigen Festivaltag (falls es einer ist) und die aktuelle
-// Uhrzeit minus Puffer (mind. 30 Min, siehe getFestivalContext), damit gerade
+// Uhrzeit minus Puffer (30 Min, siehe getFestivalContext), damit gerade
 // laufende Shows nicht rausgefiltert werden.
 // Tage: bewusst "heute + alle kommenden Tage" aktivieren (wie bei
 // resetProgFilters()/applySmartProgDefaults(), siehe getPastFestivalDays()),

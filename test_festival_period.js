@@ -21,8 +21,8 @@ function activeDays(d) {
     // Vereinheitlicht mit resetProgFilters(): "heute + alle kommenden Tage"
     // (vergangene Tage weg), nur die Zeit bleibt bewusst "smart" (aktuelle
     // Uhrzeit statt 08:00), damit der erste Blick zeigt, was gerade läuft.
-    t.check('Erster Programm-Besuch am Fr 18.09, 14 Uhr -> Fr+Sa aktiv (Mi/Do als vergangen weg), Zeit 13:00.',
-      JSON.stringify(days) === JSON.stringify(['Fr 18.09', 'Sa 19.09']) && time === '13:00', { days, time });
+    t.check('Erster Programm-Besuch am Fr 18.09, 14 Uhr -> Fr+Sa aktiv (Mi/Do als vergangen weg), Zeit 13:30.',
+      JSON.stringify(days) === JSON.stringify(['Fr 18.09', 'Sa 19.09']) && time === '13:30', { days, time });
   }
 
   // ── Test 2: Smart-Defaults greifen nur EINMAL - manuelle Änderungen danach
@@ -31,7 +31,7 @@ function activeDays(d) {
     const { window: w, document: d } = await loadApp();
     w.getBerlinNow = () => ({ year: 2026, month: 9, day: 18, hour: 14, minute: 0 });
 
-    w.switchTab('programm'); // 1. Besuch -> Smart-Default greift (Fr 18.09, 13:00)
+    w.switchTab('programm'); // 1. Besuch -> Smart-Default greift (Fr 18.09, 13:30)
     // Nutzer ändert manuell auf Samstag:
     d.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', b.dataset.day === 'Sa 19.09'));
     w.switchTab('kuenstler');
