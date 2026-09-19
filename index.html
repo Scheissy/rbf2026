@@ -422,7 +422,7 @@ input[type=file] { display: none; }
       <input type="text" id="search" placeholder="Suchen …" oninput="onSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
       <span class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</span>
     </div>
-    <select class="filter" id="fGender" onchange="render()">
+    <select class="filter" id="fGender" onchange="renderKuenstlerPreservingAnchor()">
       <option value="">Alle</option>
       <option value="männlich">männlich</option>
       <option value="weiblich">weiblich</option>
@@ -430,10 +430,10 @@ input[type=file] { display: none; }
       <option value="mixed">mixed</option>
     </select>
     <button class="filter genre-filter-btn" id="fGenreBtn" onclick="openGenreModal()">🎵 Alle Genres</button>
-    <select class="filter" id="fHerkunft" onchange="render()">
+    <select class="filter" id="fHerkunft" onchange="renderKuenstlerPreservingAnchor()">
       <option value="">Alle Herkünfte</option>
     </select>
-    <select class="filter" id="fSoundRef" onchange="render()">
+    <select class="filter" id="fSoundRef" onchange="renderKuenstlerPreservingAnchor()">
       <option value="">🔊 Referenz wählen</option>
     </select>
     <div class="prog-rating-filter">
@@ -1239,7 +1239,7 @@ const genreModalApi = makeMultiSelectFilter({
   allLabel: '🎵 Alle Genres',
   countLabel: n => `🎵 Genre (${n})`,
   toggleFnName: 'toggleGenreSelection', removeChipFnName: 'removeGenreChip', resetFnName: 'resetGenreFilter',
-  onChange: () => render()
+  onChange: () => renderKuenstlerPreservingAnchor()
 });
 function openGenreModal() { genreModalApi.open(); }
 function closeGenreModal() { genreModalApi.close(); }
@@ -1288,6 +1288,44 @@ function renderKuenstlerPreservingScroll() {
   render();
   list.scrollTop = prevScroll;
   requestAnimationFrame(() => { list.scrollTop = prevScroll; });
+}
+
+// Für Filter-/Suchänderungen reicht der reine Pixel-Offset oben NICHT aus:
+// ändert sich dabei die Ergebnismenge selbst (z.B. durch Hinzufügen einer
+// weiteren Genre-Auswahl werden plötzlich mehr/andere Künstler eingeblendet),
+// zeigt derselbe Pixel-Offset auf einmal auf eine völlig andere Stelle in der
+// neuen Liste - genau das ist das gemeldete "man landet plötzlich woanders".
+// Stattdessen wird der Künstler gemerkt, dessen Zeile vor dem Rendern zuerst
+// (mindestens teilweise) sichtbar war (jede Zeile trägt "item-<Name>" als
+// ID, siehe render()), und nach dem Rendern - falls dieser Künstler weiterhin
+// in der gefilterten Liste vorkommt - wieder an dieselbe relative Position im
+// sichtbaren Bereich gescrollt. Ist er jetzt rausgefiltert, wird bewusst ganz
+// nach oben gescrollt - ein geänderter Filter zeigt dann die neue Ergebnis-
+// liste von Anfang an, statt an einer für die neue Liste beliebigen Stelle.
+function renderKuenstlerPreservingAnchor() {
+  const list = document.getElementById('artistList');
+  const listRect = list.getBoundingClientRect();
+  let anchorName = null, anchorOffset = 0;
+  for (const item of list.children) {
+    if (!item.id || !item.id.startsWith('item-')) continue;
+    const r = item.getBoundingClientRect();
+    if (r.bottom > listRect.top) {
+      anchorName = item.id.slice(5);
+      anchorOffset = r.top - listRect.top;
+      break;
+    }
+  }
+  render();
+  if (anchorName) {
+    const newItem = document.getElementById(`item-${anchorName}`);
+    if (newItem) {
+      const newListRect = list.getBoundingClientRect();
+      const newR = newItem.getBoundingClientRect();
+      list.scrollTop += (newR.top - newListRect.top) - anchorOffset;
+      return;
+    }
+  }
+  list.scrollTop = 0;
 }
 function setRating(name, field, val) {
   if (!dataMap[name]) return;
@@ -2141,7 +2179,7 @@ function renderKuenstlerAvgFilterStars() {
 function setKuenstlerAvgFilter(n) {
   kuenstlerAvgFilter = (kuenstlerAvgFilter === n) ? 0 : n;
   renderKuenstlerAvgFilterStars();
-  render();
+  renderKuenstlerPreservingAnchor();
 }
 
 // Erkennt, ob "heute" (in der Festival-Zeitzone Europe/Berlin, NICHT der
