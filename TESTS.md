@@ -26,6 +26,8 @@ mit der Zeit ihren Nutzen.
 | `test_reset_time_independence.js` | "Filter zurücksetzen" liefert am selben Tag unabhängig von der Uhrzeit immer denselben Zustand. |
 | `test_special_char_rating_bug.js` | Regressionstest für den Escaping-Bug bei Künstlernamen mit Apostroph (Bewertung + "Gesehen" in der Programm-Übersicht). |
 | `test_rename_rescue.js` | Case-insensitive Rettung von Bewertung/Gesehen-Status bei reiner Schreibweisen-Änderung eines Künstlernamens (z.B. "Meller" -> "MELLER"), inkl. Sicherheits-Bremse bei Mehrdeutigkeit. |
+| `test_kuenstler_scroll_anchor.js` | Anker-basierte Scroll-Erhaltung in der Künstler-Übersicht bei Filteränderungen: Scroll bleibt auf dem vorher sichtbaren Künstler ausgerichtet (auch wenn sich die Ergebnismenge ändert), fällt auf scrollTop=0 zurück, wenn dieser Künstler rausgefiltert wird. |
+| `test_scroll_container_css.js` | Regressions-Schutz für `min-height: 0` auf `#artistList`/`.prog-list` (verschachtelte Flexbox-Scroll-Falle, s. Prompt-Datei) - reiner CSS-Text-Check, kein Layout-Test (jsdom berechnet kein echtes Flexbox-Layout). |
 | `test_country_abbreviation.js` | `shortenHerkunft()`: Länder-Abkürzungen (inkl. zusammengesetzter Länder mit "/"), nur in der Künstler-, nicht in der Programm-Übersicht. Nutzt eine EIGENE, kleine Testdatendatei (volle Ländernamen) statt `rbf-data.test.js`. |
 | `test_gender_abbreviation.js` | `shortenGeschlecht()`: Kollisionsfreie Kurzformen (w/m/d/mix), nur in der Künstler-Übersicht. |
 
