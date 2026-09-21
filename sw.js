@@ -1,5 +1,5 @@
-const CACHE = 'rbf2026-v4';
-const ASSETS = ['./index.html', './rbf-data.js', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'rbf2026-v5';
+const ASSETS = ['./index.html', './rbf-data.js', './rbf-walk.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   // Jede Datei einzeln cachen statt addAll(): so blockiert eine einzelne
@@ -33,7 +33,9 @@ self.addEventListener('fetch', e => {
   // rbf-data.js enthält die Künstler-/Auftrittsdaten und wird bei jedem
   // Daten-Update ausgetauscht - genau wie index.html soll das SOFORT
   // ankommen, nicht erst nach Ablauf des Cache-first-Verhaltens.
-  const isDataFile = req.url.endsWith('/rbf-data.js');
+  // rbf-walk.js (vorberechnete Fußweg-Matrix, optional) wird zusammen mit den
+  // Locations-Daten aktualisiert und deshalb genauso behandelt.
+  const isDataFile = req.url.endsWith('/rbf-data.js') || req.url.endsWith('/rbf-walk.js');
 
   if (isHTML || isDataFile) {
     // App-Shell + Datendatei: immer zuerst das Netz fragen, damit Updates

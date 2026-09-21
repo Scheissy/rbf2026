@@ -103,6 +103,10 @@ const { loadApp, createChecker } = require('./test-helpers');
     w.switchTab('kuenstler');
   });
 
+  step('In den Auswertung-Tab wechseln', () => {
+    w.switchTab('auswertung');
+  });
+
   step('In den Settings-Tab (io) wechseln', () => {
     w.switchTab('io');
   });

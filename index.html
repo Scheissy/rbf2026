@@ -241,6 +241,21 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .io-btn-arrow { color: var(--text3); font-size: 16px; }
 .info-box { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 14px; font-size: 13px; color: var(--text2); line-height: 1.6; }
 .info-box b { color: var(--text); }
+
+/* ── Auswertung-Tab ── */
+.ausw-kpis { display: flex; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
+.ausw-kpi { flex: 1; min-width: 90px; background: var(--surface2); border-radius: 8px; padding: 8px 10px; }
+.ausw-kpi-val { font-size: 18px; font-weight: 700; color: var(--text); }
+.ausw-kpi-label { font-size: 11px; color: var(--text2); }
+.ausw-sub { padding: 0 14px 6px; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
+.ausw-loc-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 9px; }
+.ausw-loc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--text); }
+.ausw-loc-meta { color: var(--text2); font-size: 11px; white-space: nowrap; }
+.ausw-loc-count { color: var(--accent); font-weight: 700; margin-left: 6px; }
+.ausw-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+.ausw-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+.ausw-empty { padding: 4px 14px 14px; font-size: 13px; color: var(--text2); }
+.ausw-note { padding: 0 14px 12px; font-size: 11px; color: var(--text2); line-height: 1.5; }
 input[type=file] { display: none; }
 
 /* BOTTOM NAV */
@@ -652,6 +667,10 @@ input[type=file] { display: none; }
 
 
 
+<div id="view-auswertung" class="view hidden">
+  <div class="io-view" id="auswertungContent"></div>
+</div>
+
 <div class="bottomnav">
   <div class="nav-btn active" id="nav-kuenstler" onclick="switchTab('kuenstler')">
     <div class="nav-icon">🎤</div>
@@ -660,6 +679,10 @@ input[type=file] { display: none; }
   <div class="nav-btn" id="nav-programm" onclick="switchTab('programm')">
     <div class="nav-icon">📅</div>
     <div>Programm</div>
+  </div>
+  <div class="nav-btn" id="nav-auswertung" onclick="switchTab('auswertung')">
+    <div class="nav-icon">📊</div>
+    <div>Auswertung</div>
   </div>
   <div class="nav-btn" id="nav-io" onclick="switchTab('io')">
     <div class="nav-icon">⚙️</div>
@@ -670,6 +693,7 @@ input[type=file] { display: none; }
 <div class="toast" id="toast"></div>
 
 <script src="rbf-data.js"></script>
+<script src="rbf-walk.js"></script>
 <script>
 // ── DATA ────────────────────────────────────────────────────────────────────
 
@@ -965,9 +989,155 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── TABS ─────────────────────────────────────────────────────────────────────
+// ── AUSWERTUNG ───────────────────────────────────────────────────────────────
+// Ein Auftritt gilt als "besucht", sobald eine Dauer eingetragen ODER eine
+// Auftritts-Bewertung gesetzt wurde (eines von beiden genügt). Bewusst NICHT
+// der künstlerbezogene Gesehen-Status: die Auswertung orientiert sich an der
+// einzelnen Show (showKey), nicht am Künstler.
+function isShowVisited(a) {
+  const k = showKey(a);
+  return (showDurations[k] || 0) > 0 || (showRatings[k] || 0) > 0;
+}
+// Basis der Auswertung: ALLE Auftritte (+ Sonderveranstaltungen, solange der
+// globale Settings-Schalter an ist) - bewusst ungefiltert, d.h. weder
+// Programm-Filter noch dauerhaft ausgeblendete Locations noch Ausblenden-
+// Flags verfälschen die Auswertung (ein besuchter Auftritt bleibt besucht).
+function auswertungEntries() {
+  return auftritte.concat(appSettings.showRbfEvents ? rbfEvents : []);
+}
+function auswertungStats(entries) {
+  const visited = entries.filter(isShowVisited);
+  let totalMinutes = 0, ratingSum = 0, ratingCount = 0;
+  const byLoc = {};
+  visited.forEach(a => {
+    const k = showKey(a);
+    const dur = showDurations[k] || 0, r = showRatings[k] || 0;
+    totalMinutes += dur;
+    if (r > 0) { ratingSum += r; ratingCount++; }
+    const loc = (a.location || '').trim() || 'Ohne Location';
+    const e = byLoc[loc] || (byLoc[loc] = { location: loc, count: 0, minutes: 0 });
+    e.count++;
+    e.minutes += dur;
+  });
+  const locations = Object.values(byLoc)
+    .sort((x, y) => y.count - x.count || x.location.localeCompare(y.location, 'de'));
+  return { visitedCount: visited.length, totalMinutes, avgRating: ratingCount ? ratingSum / ratingCount : null, locations };
+}
+// ── WEGSTRECKE ───────────────────────────────────────────────────────────────
+// Strecke = Weg zwischen aufeinanderfolgenden BESUCHTEN Auftritten eines Tages
+// (chronologisch, Zeiten nach Mitternacht korrekt einsortiert). Wege zu Hotel,
+// Essen o.ä. sind unbekannt - das Ergebnis ist also eine Untergrenze. Es gibt
+// bewusst keine Wege über Tagesgrenzen hinweg; "Gesamt" ist die Summe der Tage.
+// Quelle 1 (exakt): WALK_DISTANCES aus rbf-walk.js = vorberechnete Fußweg-Matrix
+// in Metern (erzeugt von build-walk-matrix.js). Die Datei ist OPTIONAL: fehlt
+// sie - oder fehlt eine Location darin - fällt die Berechnung auf die Luftlinie
+// (Haversine) aus VENUE_LOCATIONS zurück und wird als solche gekennzeichnet.
+function walkDataAvailable() {
+  return typeof WALK_DISTANCES !== 'undefined' && !!WALK_DISTANCES && !!WALK_DISTANCES.venues && Array.isArray(WALK_DISTANCES.meters);
+}
+function haversineMeters(a, b) {
+  const R = 6371000, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function walkVenueIndex(loc) {
+  if (!walkDataAvailable()) return -1;
+  const i = WALK_DISTANCES.venues[loc];
+  return Number.isInteger(i) ? i : -1;
+}
+function venueCoords(loc) {
+  const v = (typeof VENUE_LOCATIONS !== 'undefined' && VENUE_LOCATIONS) ? VENUE_LOCATIONS[loc] : null;
+  if (!v || v.lat == null || v.lng == null) return null;
+  const lat = Number(v.lat), lng = Number(v.lng);
+  return (isFinite(lat) && isFinite(lng)) ? { lat, lng } : null;
+}
+function venueHasGeo(loc) { return walkVenueIndex(loc) >= 0 || !!venueCoords(loc); }
+// { meters, exact } - exact=true: Fußweg-Matrix (oder identischer Ort), false:
+// Luftlinie. null, wenn für eine der beiden Locations gar keine Koordinaten da sind.
+function walkMeters(locA, locB) {
+  const a = (locA || '').trim(), b = (locB || '').trim();
+  if (!a || !b) return null;
+  if (a === b) return { meters: 0, exact: true };
+  const ia = walkVenueIndex(a), ib = walkVenueIndex(b);
+  if (ia >= 0 && ib >= 0) {
+    const row = WALK_DISTANCES.meters[ia];
+    const m = row ? row[ib] : undefined;
+    if (typeof m === 'number' && isFinite(m)) return { meters: m, exact: true };
+  }
+  const ca = venueCoords(a), cb = venueCoords(b);
+  if (ca && cb) return { meters: Math.round(haversineMeters(ca, cb)), exact: false };
+  return null;
+}
+function formatMeters(m) {
+  if (m < 1000) return `${Math.round(m)} m`;
+  return `${(m / 1000).toFixed(1).replace('.', ',')} km`;
+}
+// Ergebnis: meters (Summe), legs (Anzahl Wechsel), airLegs (davon nur Luftlinie),
+// skipped (besuchte Auftritte ohne Uhrzeit oder ohne Koordinaten - nicht in der
+// Kette; wegen Dreiecksungleichung bleibt die Summe trotzdem eine Untergrenze).
+function walkStats(entries) {
+  const byDay = {};
+  entries.filter(isShowVisited).forEach(a => { (byDay[a.day] = byDay[a.day] || []).push(a); });
+  let meters = 0, legs = 0, airLegs = 0, skipped = 0;
+  Object.values(byDay).forEach(list => {
+    const stops = list
+      .filter(a => a.time && venueHasGeo((a.location || '').trim()))
+      .sort((x, y) => timeSortValue(x.time) - timeSortValue(y.time));
+    skipped += list.length - stops.length;
+    for (let i = 1; i < stops.length; i++) {
+      const w = walkMeters(stops[i - 1].location, stops[i].location);
+      if (!w) { skipped++; continue; }
+      meters += w.meters;
+      legs++;
+      if (!w.exact) airLegs++;
+    }
+  });
+  const kind = legs === 0 ? 'none' : airLegs === 0 ? 'walk' : airLegs === legs ? 'air' : 'mixed';
+  return { meters, legs, airLegs, skipped, kind };
+}
+
+function auswertungBlockHTML(title, id, entries) {
+  const s = auswertungStats(entries);
+  let body;
+  if (!s.visitedCount) {
+    body = '<div class="ausw-empty">Noch keine besuchten Auftritte.</div>';
+  } else {
+    const max = s.locations[0].count;
+    const kpi = (val, label, attrs = '') => `<div class="ausw-kpi"${attrs}><div class="ausw-kpi-val">${val}</div><div class="ausw-kpi-label">${label}</div></div>`;
+    const walk = walkStats(entries);
+    const walkLabel = { none: 'Strecke', walk: 'Fußweg', air: 'Luftlinie', mixed: 'Weg (teils Luftlinie)' }[walk.kind];
+    const walkNote = walk.skipped > 0
+      ? `<div class="ausw-note">ℹ️ ${walk.skipped === 1 ? '1 besuchter Auftritt ist' : `${walk.skipped} besuchte Auftritte sind`} (ohne Uhrzeit oder Koordinaten) in der Strecke nicht enthalten.</div>`
+      : '';
+    body = `<div class="ausw-kpis">
+        ${kpi(s.visitedCount, 'Auftritte besucht')}
+        ${kpi(s.totalMinutes > 0 ? formatDuration(s.totalMinutes) : '–', 'Zeit vor Ort')}
+        ${kpi(s.avgRating !== null ? s.avgRating.toFixed(1) : '–', 'Ø Bewertung')}
+        ${kpi(walk.legs > 0 ? formatMeters(walk.meters) : '–', walkLabel, ` data-walk-kind="${walk.kind}"`)}
+      </div>
+      ${walkNote}
+      <div class="ausw-sub">📍 Locations</div>
+      <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc">
+        <div class="ausw-loc-head"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${l.minutes > 0 ? formatDuration(l.minutes) : ''}</span><span class="ausw-loc-count">${l.count}×</span></span></div>
+        <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${Math.round(l.count / max * 100)}%"></div></div>
+      </div>`).join('')}</div>`;
+  }
+  return `<div class="io-section ausw-block" data-ausw="${escapeHtml(id)}"><div class="io-section-title">${escapeHtml(title)}</div>${body}</div>`;
+}
+function renderAuswertung() {
+  const el = document.getElementById('auswertungContent');
+  if (!el) return;
+  const entries = auswertungEntries();
+  let html = `<div class="info-box"><b>📊 Wann zählt ein Auftritt als besucht?</b><br>Sobald eine <b>Dauer</b> eingetragen <i>oder</i> der Auftritt <b>bewertet</b> wurde – eines von beiden genügt.<br><br><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages – ohne Wege zu Hotel, Essen usw., also eine Untergrenze. ${walkDataAvailable() ? 'Fußwege sind vorberechnet (© OpenStreetMap-Mitwirkende, Routing: OSRM).' : 'Ohne hinterlegte Fußweg-Daten wird die Luftlinie verwendet und als „Luftlinie“ gekennzeichnet.'}</div>`;
+  html += auswertungBlockHTML('Gesamt', 'gesamt', entries);
+  DAY_ORDER.forEach(day => { html += auswertungBlockHTML(day, day, entries.filter(a => a.day === day)); });
+  el.innerHTML = html;
+}
+
 function switchTab(tab) {
   currentTab = tab;
-  ['kuenstler','programm','io'].forEach(t => {
+  ['kuenstler','programm','auswertung','io'].forEach(t => {
     const el = document.getElementById(`view-${t}`);
     if (t === tab) {
       el.classList.remove('hidden');
@@ -982,6 +1152,7 @@ function switchTab(tab) {
     if (!smartProgDefaultsApplied) { applySmartProgDefaults(); smartProgDefaultsApplied = true; }
     renderProg();
   }
+  if (tab === 'auswertung') renderAuswertung();
 }
 
 // Präzise Standortdaten (GPS-Koordinaten bzw. Adresse) der bekannten RBF-Venues,

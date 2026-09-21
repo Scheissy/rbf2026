@@ -6,7 +6,7 @@
 // Warte-Timeout - ca. 20 Zeilen pro Datei) an einer einzigen Stelle pflegen.
 //
 // Schritt 1 (diese Datei): komplett eigenständig - keine bestehende
-// Testdatei wurde angefasst, alle 16 laufen unverändert weiter genau wie
+// Testdatei wurde angefasst, alle Testdateien laufen unverändert weiter genau wie
 // vorher, unabhängig davon, ob diese Helper existieren.
 // Schritt 2 (später, optional, separat zu entscheiden): bestehende
 // Testdateien nach und nach hierauf umstellen, um die Duplikation
@@ -34,6 +34,8 @@ const DEFAULT_INIT_DELAY_MS = 300;
  *     verfügbar statt in jeder Datei einzeln nachgebaut.
  * @param {string} [opts.dataPath]     - Alternativer Pfad zu einer
  *     Testdaten-Datei, statt rbf-data.test.js.
+ * @param {string} [opts.walkScript]   - Inhalt von rbf-walk.js (Fußweg-Matrix,
+ *     `const WALK_DISTANCES = {...}`). Standard: leer = Datei nicht vorhanden.
  * @param {number} [opts.initDelayMs]  - Wartezeit nach dem Laden (ms).
  * @param {boolean} [opts.trackErrors] - Wenn true, werden window-'error'-
  *     Events in .errors gesammelt (für Rauchtests, die auf "keine
@@ -46,10 +48,15 @@ async function loadApp(opts = {}) {
     ? opts.dataScript
     : fs.readFileSync(opts.dataPath || DEFAULT_DATA_PATH, 'utf-8');
 
-  const htmlForTest = html.replace(
-    /<script src="rbf-data\.js"><\/script>/,
-    `<script>${dataScript}</script>`
-  );
+  // rbf-walk.js (optionale Fußweg-Matrix) wird wie rbf-data.js inline ersetzt -
+  // sonst würde jsdom (resources: 'usable') die Datei echt aus dem Netz laden.
+  // Standard: leer = "Datei nicht vorhanden" (App fällt auf Luftlinie zurück).
+  const walkScript = opts.walkScript !== undefined ? opts.walkScript : '';
+  // Funktions-Replacer statt String: sonst würden "$&"/"$'"-Muster im
+  // eingebetteten Skript als Ersetzungsmuster missverstanden.
+  const htmlForTest = html
+    .replace(/<script src="rbf-data\.js"><\/script>/, () => `<script>${dataScript}</script>`)
+    .replace(/<script src="rbf-walk\.js"><\/script>/, () => `<script>${walkScript}</script>`);
 
   const errors = [];
   const vc = new VirtualConsole();
