@@ -107,6 +107,11 @@ const { loadApp, createChecker } = require('./test-helpers');
     w.switchTab('auswertung');
   });
 
+  step('Auswertung: Sortierung auf Dauer und zurück auf Häufigkeit umschalten', () => {
+    w.setAuswertungSort('duration');
+    w.setAuswertungSort('count');
+  });
+
   step('In den Settings-Tab (io) wechseln', () => {
     w.switchTab('io');
   });

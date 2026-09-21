@@ -251,7 +251,12 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .ausw-loc-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 9px; }
 .ausw-loc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--text); }
 .ausw-loc-meta { color: var(--text2); font-size: 11px; white-space: nowrap; }
-.ausw-loc-count { color: var(--accent); font-weight: 700; margin-left: 6px; }
+.ausw-loc-main { color: var(--accent); font-weight: 700; margin-left: 6px; }
+.ausw-sort { padding: 0 14px 4px; }
+.ausw-sort-label { display: block; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.ausw-sort-btns { display: flex; gap: 6px; }
+.ausw-sort-btn { flex: 1; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; }
+.ausw-sort-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
 .ausw-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-top: 3px; }
 .ausw-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
 .ausw-empty { padding: 4px 14px 14px; font-size: 13px; color: var(--text2); }
@@ -805,7 +810,7 @@ let statsAusgeblendetFilter = false;
 // lebt jetzt rein hier, gesetzt/zurückgesetzt über filterByStat().
 let kuenstlerSeenFilter = '';
 // Anzeige-Einstellungen (Settings-Tab), geräteweise in localStorage gespeichert
-let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true, showMusicEvents: true, showOtherEvents: true, progFiltersExpanded: false, showRbfEvents: true };
+let appSettings = { showMapsLinks: true, showListening: true, showSoundRef: true, hiddenLocations: [], persistFilters: true, showMusicEvents: true, showOtherEvents: true, progFiltersExpanded: false, showRbfEvents: true, auswertungSort: 'count' };
 let selectedGenres = new Set(); // Mehrfachauswahl im Genre-Filter (leer = alle)
 let selectedLocs = new Set(); // Mehrfachauswahl im Location-Filter der Programm-Übersicht (leer = alle)
 // Eigener Genre-Mehrfachfilter für die Programm-Übersicht - analog zum
@@ -1005,7 +1010,17 @@ function isShowVisited(a) {
 function auswertungEntries() {
   return auftritte.concat(appSettings.showRbfEvents ? rbfEvents : []);
 }
-function auswertungStats(entries) {
+// Sortierung des Location-Rankings: Hauptkriterium + Tie-Breaker.
+//   'count':    Häufigkeit, bei Gleichstand Gesamtdauer, danach Name
+//   'duration': Gesamtdauer, bei Gleichstand Häufigkeit, danach Name
+function auswertungSortMode() { return appSettings.auswertungSort === 'duration' ? 'duration' : 'count'; }
+function compareLocations(mode) {
+  return (x, y) => (mode === 'duration'
+    ? (y.minutes - x.minutes) || (y.count - x.count)
+    : (y.count - x.count) || (y.minutes - x.minutes))
+    || x.location.localeCompare(y.location, 'de');
+}
+function auswertungStats(entries, sortMode) {
   const visited = entries.filter(isShowVisited);
   let totalMinutes = 0, ratingSum = 0, ratingCount = 0;
   const byLoc = {};
@@ -1019,8 +1034,7 @@ function auswertungStats(entries) {
     e.count++;
     e.minutes += dur;
   });
-  const locations = Object.values(byLoc)
-    .sort((x, y) => y.count - x.count || x.location.localeCompare(y.location, 'de'));
+  const locations = Object.values(byLoc).sort(compareLocations(sortMode || auswertungSortMode()));
   return { visitedCount: visited.length, totalMinutes, avgRating: ratingCount ? ratingSum / ratingCount : null, locations };
 }
 // ── WEGSTRECKE ───────────────────────────────────────────────────────────────
@@ -1103,7 +1117,10 @@ function auswertungBlockHTML(title, id, entries) {
   if (!s.visitedCount) {
     body = '<div class="ausw-empty">Noch keine besuchten Auftritte.</div>';
   } else {
-    const max = s.locations[0].count;
+    const mode = auswertungSortMode();
+    // Balken bezogen auf das Sortierkriterium (Erster = Maximum, da danach sortiert).
+    const barMax = mode === 'duration' ? s.locations[0].minutes : s.locations[0].count;
+    const barPct = l => barMax > 0 ? Math.round((mode === 'duration' ? l.minutes : l.count) / barMax * 100) : 0;
     const kpi = (val, label, attrs = '') => `<div class="ausw-kpi"${attrs}><div class="ausw-kpi-val">${val}</div><div class="ausw-kpi-label">${label}</div></div>`;
     const walk = walkStats(entries);
     const walkLabel = { none: 'Strecke', walk: 'Fußweg', air: 'Luftlinie', mixed: 'Weg (teils Luftlinie)' }[walk.kind];
@@ -1118,9 +1135,9 @@ function auswertungBlockHTML(title, id, entries) {
       </div>
       ${walkNote}
       <div class="ausw-sub">📍 Locations</div>
-      <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc">
-        <div class="ausw-loc-head"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${l.minutes > 0 ? formatDuration(l.minutes) : ''}</span><span class="ausw-loc-count">${l.count}×</span></span></div>
-        <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${Math.round(l.count / max * 100)}%"></div></div>
+      <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}">
+        <div class="ausw-loc-head"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${mode === 'duration' ? `${l.count}×` : (l.minutes > 0 ? formatDuration(l.minutes) : '')}</span><span class="ausw-loc-main">${mode === 'duration' ? (l.minutes > 0 ? formatDuration(l.minutes) : '–') : `${l.count}×`}</span></span></div>
+        <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(l)}%"></div></div>
       </div>`).join('')}</div>`;
   }
   return `<div class="io-section ausw-block" data-ausw="${escapeHtml(id)}"><div class="io-section-title">${escapeHtml(title)}</div>${body}</div>`;
@@ -1130,9 +1147,28 @@ function renderAuswertung() {
   if (!el) return;
   const entries = auswertungEntries();
   let html = `<div class="info-box"><b>📊 Wann zählt ein Auftritt als besucht?</b><br>Sobald eine <b>Dauer</b> eingetragen <i>oder</i> der Auftritt <b>bewertet</b> wurde – eines von beiden genügt.<br><br><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages – ohne Wege zu Hotel, Essen usw., also eine Untergrenze. ${walkDataAvailable() ? 'Fußwege sind vorberechnet (© OpenStreetMap-Mitwirkende, Routing: OSRM).' : 'Ohne hinterlegte Fußweg-Daten wird die Luftlinie verwendet und als „Luftlinie“ gekennzeichnet.'}</div>`;
+  const mode = auswertungSortMode();
+  html += `<div class="ausw-sort"><span class="ausw-sort-label">📍 Locations sortieren nach</span>
+      <div class="ausw-sort-btns">
+        <button class="ausw-sort-btn${mode === 'count' ? ' active' : ''}" data-sort="count" onclick="setAuswertungSort('count')">Häufigkeit</button>
+        <button class="ausw-sort-btn${mode === 'duration' ? ' active' : ''}" data-sort="duration" onclick="setAuswertungSort('duration')">Dauer</button>
+      </div></div>
+    <div class="ausw-note">Bei Gleichstand zählt die jeweils andere Größe, danach der Name.</div>`;
   html += auswertungBlockHTML('Gesamt', 'gesamt', entries);
   DAY_ORDER.forEach(day => { html += auswertungBlockHTML(day, day, entries.filter(a => a.day === day)); });
+  // Scroll-Position erhalten (Pixel-Offset): der Umschalter wird neu gerendert,
+  // der Nutzer soll nicht nach oben springen.
+  const view = document.getElementById('view-auswertung');
+  const scroll = view ? view.scrollTop : 0;
   el.innerHTML = html;
+  if (view) view.scrollTop = scroll;
+}
+// Dauerhafte Ansichts-Einstellung (kein Filter): überlebt Reload und wird von
+// "Filter zurücksetzen"/"Jetzt" nicht berührt.
+function setAuswertungSort(mode) {
+  appSettings.auswertungSort = mode === 'duration' ? 'duration' : 'count';
+  saveToStorage();
+  renderAuswertung();
 }
 
 function switchTab(tab) {

@@ -9,7 +9,7 @@ const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
 const block = (d, id) => d.querySelector(`.ausw-block[data-ausw="${id}"]`);
 const rows = (d, id) => [...block(d, id).querySelectorAll('.ausw-loc')].map(r => ({
   name: r.querySelector('.ausw-loc-head > span:first-child').textContent,
-  count: parseInt(r.querySelector('.ausw-loc-count').textContent, 10),
+  count: parseInt(r.getAttribute('data-count'), 10),
   width: r.querySelector('.ausw-bar-fill').style.width
 }));
 // Die ersten drei Kennzahlen (Anzahl, Zeit, Ø); die 4. (Strecke) prüft test_walk_distance.js.
