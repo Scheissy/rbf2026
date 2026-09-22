@@ -243,7 +243,10 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .info-box b { color: var(--text); }
 
 /* ── Auswertung-Tab ── */
+.ausw-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 4px; }
+.ausw-header-title { font-size: 16px; font-weight: 700; color: var(--text); }
 .ausw-kpis { display: flex; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
+
 .ausw-kpi { flex: 1; min-width: 90px; background: var(--surface2); border-radius: 8px; padding: 8px 10px; }
 .ausw-kpi-val { font-size: 18px; font-weight: 700; color: var(--text); }
 .ausw-kpi-label { font-size: 11px; color: var(--text2); }
@@ -677,6 +680,20 @@ input[type=file] { display: none; }
 </div>
 
 
+
+<div class="modal-backdrop" id="auswertungInfoModal" onclick="handleAuswertungInfoBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📊 Wie funktioniert die Auswertung?</div>
+      <button class="modal-close" onclick="closeAuswertungInfoModal()">✕</button>
+    </div>
+    <div class="modal-body" style="font-size:14px;line-height:1.5">
+      <p style="margin:0 0 10px"><b>Wann zählt ein Auftritt als besucht?</b><br>Sobald eine <b>Dauer</b> eingetragen <i>oder</i> der Auftritt <b>bewertet</b> wurde - eines von beiden genügt.</p>
+      <p style="margin:0 0 10px"><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages - ohne Wege zu Hotel, Essen usw., also eine Untergrenze. <span id="auswertungInfoWalkNote"></span></p>
+      <p style="margin:0"><b>⭐ Bewertungen</b><br>Verteilung und Location-Sortierung nutzen ausschließlich die <b>Auftritts-Bewertung</b>, nicht die künstlerbezogene Promo-/Listening-Bewertung.</p>
+    </div>
+  </div>
+</div>
 
 <div id="view-auswertung" class="view hidden">
   <div class="io-view" id="auswertungContent"></div>
@@ -1184,7 +1201,10 @@ function renderAuswertung() {
   const el = document.getElementById('auswertungContent');
   if (!el) return;
   const entries = auswertungEntries();
-  let html = `<div class="info-box"><b>📊 Wann zählt ein Auftritt als besucht?</b><br>Sobald eine <b>Dauer</b> eingetragen <i>oder</i> der Auftritt <b>bewertet</b> wurde – eines von beiden genügt.<br><br><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages – ohne Wege zu Hotel, Essen usw., also eine Untergrenze. ${walkDataAvailable() ? 'Fußwege sind vorberechnet (© OpenStreetMap-Mitwirkende, Routing: OSRM).' : 'Ohne hinterlegte Fußweg-Daten wird die Luftlinie verwendet und als „Luftlinie“ gekennzeichnet.'}<br><br><b>⭐ Bewertungen</b><br>Verteilung und Location-Sortierung nutzen ausschließlich die <b>Auftritts-Bewertung</b>, nicht die künstlerbezogene Promo-/Listening-Bewertung.</div>`;
+  let html = `<div class="ausw-header">
+    <div class="ausw-header-title">📊 Auswertung</div>
+    <button type="button" class="info-icon-btn" onclick="event.stopPropagation();openAuswertungInfoModal()" title="Wie funktioniert die Auswertung?" aria-label="Erklärung zur Auswertung">ⓘ</button>
+  </div>`;
   const mode = auswertungSortMode();
   html += `<div class="ausw-sort"><span class="ausw-sort-label">📍 Locations sortieren nach</span>
       <div class="ausw-sort-btns">
@@ -2632,6 +2652,21 @@ function openLocFilterInfoModal() {
 }
 function closeLocFilterInfoModal() {
   document.getElementById('locFilterInfoModal').classList.remove('open');
+}
+function openAuswertungInfoModal() {
+  // Der Fußweg-Hinweis hängt davon ab, ob rbf-walk.js geladen ist - deshalb
+  // erst beim Öffnen befüllen statt fest im Markup zu verdrahten.
+  const note = document.getElementById('auswertungInfoWalkNote');
+  if (note) note.textContent = walkDataAvailable()
+    ? 'Fußwege sind vorberechnet (© OpenStreetMap-Mitwirkende, Routing: OSRM).'
+    : 'Ohne hinterlegte Fußweg-Daten wird die Luftlinie verwendet und als „Luftlinie“ gekennzeichnet.';
+  document.getElementById('auswertungInfoModal').classList.add('open');
+}
+function closeAuswertungInfoModal() {
+  document.getElementById('auswertungInfoModal').classList.remove('open');
+}
+function handleAuswertungInfoBackdropClick(e) {
+  if (e.target.id === 'auswertungInfoModal') closeAuswertungInfoModal();
 }
 function handleLocFilterInfoBackdropClick(e) {
   if (e.target.id === 'locFilterInfoModal') closeLocFilterInfoModal();

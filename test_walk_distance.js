@@ -90,8 +90,15 @@ async function loadWith(walkScript) {
       d.querySelector('.ausw-block[data-ausw="Fr 18.09"] .ausw-note').textContent.includes('2 besuchte Auftritte sind'));
     t.check('Sa: nur ein Stopp -> keine Strecke ("–"), Label neutral.', walkVal(d, 'Sa 19.09') === '–' && walkLabel(d, 'Sa 19.09') === 'Strecke');
     t.check('Gesamt = Summe der Tage; kein Weg über die Tagesgrenze Fr -> Sa.', walkVal(d, 'gesamt') === km(expected), walkVal(d, 'gesamt'));
-    t.check('Info-Text erwähnt die Luftlinien-Näherung, keine OSM-Quellenangabe.',
-      d.getElementById('auswertungContent').textContent.includes('Luftlinie') && !d.getElementById('auswertungContent').textContent.includes('OpenStreetMap'));
+    // Die frühere feste Info-Box ist einem ⓘ-Icon-Modal gewichen - der erklärende
+    // Text wird erst beim Öffnen befüllt (openAuswertungInfoModal()), nicht beim
+    // bloßen Rendern der Blöcke. Kennzeichnung IN den Kennzahlen selbst bleibt
+    // aber unverändert sichtbar (siehe walkLabel-Prüfungen oben/unten).
+    w.openAuswertungInfoModal();
+    const modalText = d.getElementById('auswertungInfoModal').textContent;
+    t.check('Info-Modal erwähnt die Luftlinien-Näherung, keine OSM-Quellenangabe.',
+      modalText.includes('Luftlinie') && !modalText.includes('OpenStreetMap'), modalText);
+    w.closeAuswertungInfoModal();
   }
 
   // ── Mit vollständiger Fußweg-Matrix ────────────────────────────────────
@@ -101,7 +108,9 @@ async function loadWith(walkScript) {
       meters: [[0, 100, 700], [100, 0, 700], [700, 700, 0]] };`;
     const { window: w, document: d } = await loadWith(matrix);
     t.check('Mit Matrix: Fr = 100 + 700 + 700 = 1,5 km, Label "Fußweg".', walkVal(d, 'Fr 18.09') === '1,5 km' && walkLabel(d, 'Fr 18.09') === 'Fußweg' && walkKpi(d, 'Fr 18.09').getAttribute('data-walk-kind') === 'walk', { val: walkVal(d, 'Fr 18.09'), label: walkLabel(d, 'Fr 18.09') });
-    t.check('Mit Matrix zeigt der Info-Text die OpenStreetMap-Quellenangabe.', d.getElementById('auswertungContent').textContent.includes('OpenStreetMap'));
+    w.openAuswertungInfoModal();
+    t.check('Mit Matrix zeigt das Info-Modal die OpenStreetMap-Quellenangabe.', d.getElementById('auswertungInfoModal').textContent.includes('OpenStreetMap'));
+    w.closeAuswertungInfoModal();
     const m = w.walkMeters('Docks', 'Prinzenbar');
     t.check('walkMeters nutzt die Matrix (exact=true) statt der Luftlinie.', m.meters === 100 && m.exact === true, m);
     t.check('Alias-Locations mit gleichem Matrix-Index = 0 m (exakt).', JSON.stringify(w.walkMeters('Molotow', 'Molotow Top Ten Bar')) === '{"meters":0,"exact":true}');

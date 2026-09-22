@@ -103,8 +103,10 @@ const { loadApp, createChecker } = require('./test-helpers');
     w.switchTab('kuenstler');
   });
 
-  step('In den Auswertung-Tab wechseln', () => {
+  step('In den Auswertung-Tab wechseln, Info-Modal öffnen und schließen', () => {
     w.switchTab('auswertung');
+    w.openAuswertungInfoModal();
+    w.closeAuswertungInfoModal();
   });
 
   step('Auswertung: alle drei Sortierungen (inkl. Bewertung) durchschalten', () => {
