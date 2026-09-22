@@ -44,9 +44,17 @@ function air(a, b) {
 const leg = (x, y) => Math.round(air(COORDS[x], COORDS[y]));
 const km = m => m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
 
-const walkKpi = (d, id) => d.querySelector(`.ausw-block[data-ausw="${id}"] .ausw-kpi[data-walk-kind]`);
-const walkVal = (d, id) => { const k = walkKpi(d, id); return k && k.querySelector('.ausw-kpi-val').textContent; };
-const walkLabel = (d, id) => { const k = walkKpi(d, id); return k && k.querySelector('.ausw-kpi-label').textContent; };
+const ALL_DAYS = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
+function selectDays(d, wantedDays) {
+  ALL_DAYS.forEach(day => {
+    const dayBtn = [...d.querySelectorAll('.ausw-day-btn')].find(b => b.dataset.day === day);
+    if (dayBtn.classList.contains('active') !== wantedDays.includes(day)) dayBtn.click();
+  });
+}
+const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
+const walkKpi = d => block(d).querySelector('.ausw-kpi[data-walk-kind]');
+const walkVal = d => { const k = walkKpi(d); return k && k.querySelector('.ausw-kpi-val').textContent; };
+const walkLabel = d => { const k = walkKpi(d); return k && k.querySelector('.ausw-kpi-label').textContent; };
 
 // Alle Auftritte außer Act5 (keine Koordinaten), Act6 (keine Uhrzeit) und Act7 (Sa) am Fr besucht.
 async function loadWith(walkScript) {
@@ -84,12 +92,17 @@ async function loadWith(walkScript) {
     const wrongOrder = leg('Docks', 'Docks') + leg('Docks', 'Prinzenbar') + leg('Prinzenbar', 'Molotow'); // 00:10 fälschlich zuerst
     t.check('Testvoraussetzung: richtige und falsche Reihenfolge ergeben unterschiedliche Strecken.', expected !== wrongOrder, { expected, wrongOrder });
 
-    t.check(`Fr: Strecke = ${km(expected)} (Zeiten nach Mitternacht korrekt einsortiert, Act5/Act6 nicht in der Kette).`, walkVal(d, 'Fr 18.09') === km(expected), walkVal(d, 'Fr 18.09'));
-    t.check('Ohne Fußweg-Datei wird die Strecke als "Luftlinie" gekennzeichnet.', walkLabel(d, 'Fr 18.09') === 'Luftlinie' && walkKpi(d, 'Fr 18.09').getAttribute('data-walk-kind') === 'air');
+    // Standardauswahl = alle Tage: Sa trägt 0 bei (nur 1 Stopp), die Strecke
+    // entspricht also exakt der Fr-Kette - der Beweis, dass es KEINEN Weg über
+    // die Tagesgrenze Fr -> Sa gibt (sonst wäre der Wert höher).
+    t.check(`Mit allen Tagen ausgewählt: Strecke = ${km(expected)} (Zeiten nach Mitternacht korrekt einsortiert, Act5/Act6 nicht in der Kette, kein Weg über die Tagesgrenze zu Sa).`,
+      walkVal(d) === km(expected), walkVal(d));
+    t.check('Ohne Fußweg-Datei wird die Strecke als "Luftlinie" gekennzeichnet.', walkLabel(d) === 'Luftlinie' && walkKpi(d).getAttribute('data-walk-kind') === 'air');
     t.check('Hinweis nennt die 2 nicht berücksichtigten Auftritte (ohne Koordinaten / ohne Uhrzeit).',
-      d.querySelector('.ausw-block[data-ausw="Fr 18.09"] .ausw-note').textContent.includes('2 besuchte Auftritte sind'));
-    t.check('Sa: nur ein Stopp -> keine Strecke ("–"), Label neutral.', walkVal(d, 'Sa 19.09') === '–' && walkLabel(d, 'Sa 19.09') === 'Strecke');
-    t.check('Gesamt = Summe der Tage; kein Weg über die Tagesgrenze Fr -> Sa.', walkVal(d, 'gesamt') === km(expected), walkVal(d, 'gesamt'));
+      block(d).querySelector('.ausw-note').textContent.includes('2 besuchte Auftritte sind'));
+    selectDays(d, ['Sa 19.09']);
+    t.check('Nur Sa ausgewählt: nur ein Stopp -> keine Strecke ("–"), Label neutral.', walkVal(d) === '–' && walkLabel(d) === 'Strecke');
+    selectDays(d, ALL_DAYS);
     // Die frühere feste Info-Box ist einem ⓘ-Icon-Modal gewichen - der erklärende
     // Text wird erst beim Öffnen befüllt (openAuswertungInfoModal()), nicht beim
     // bloßen Rendern der Blöcke. Kennzeichnung IN den Kennzahlen selbst bleibt
@@ -107,7 +120,7 @@ async function loadWith(walkScript) {
       venues: { 'Docks': 0, 'Prinzenbar': 1, 'Molotow': 2, 'Molotow Top Ten Bar': 2 },
       meters: [[0, 100, 700], [100, 0, 700], [700, 700, 0]] };`;
     const { window: w, document: d } = await loadWith(matrix);
-    t.check('Mit Matrix: Fr = 100 + 700 + 700 = 1,5 km, Label "Fußweg".', walkVal(d, 'Fr 18.09') === '1,5 km' && walkLabel(d, 'Fr 18.09') === 'Fußweg' && walkKpi(d, 'Fr 18.09').getAttribute('data-walk-kind') === 'walk', { val: walkVal(d, 'Fr 18.09'), label: walkLabel(d, 'Fr 18.09') });
+    t.check('Mit Matrix: Fr = 100 + 700 + 700 = 1,5 km, Label "Fußweg".', walkVal(d) === '1,5 km' && walkLabel(d) === 'Fußweg' && walkKpi(d).getAttribute('data-walk-kind') === 'walk', { val: walkVal(d), label: walkLabel(d) });
     w.openAuswertungInfoModal();
     t.check('Mit Matrix zeigt das Info-Modal die OpenStreetMap-Quellenangabe.', d.getElementById('auswertungInfoModal').textContent.includes('OpenStreetMap'));
     w.closeAuswertungInfoModal();
@@ -123,8 +136,8 @@ async function loadWith(walkScript) {
     const { document: d } = await loadWith(matrix);
     const expected = 100 + leg('Prinzenbar', 'Molotow') + leg('Molotow', 'Docks');
     t.check('Fehlt eine Location in der Matrix, wird nur dieser Wechsel als Luftlinie gerechnet ("teils Luftlinie").',
-      walkVal(d, 'Fr 18.09') === km(expected) && walkKpi(d, 'Fr 18.09').getAttribute('data-walk-kind') === 'mixed' && walkLabel(d, 'Fr 18.09') === 'Weg (teils Luftlinie)',
-      { val: walkVal(d, 'Fr 18.09'), expected: km(expected), label: walkLabel(d, 'Fr 18.09') });
+      walkVal(d) === km(expected) && walkKpi(d).getAttribute('data-walk-kind') === 'mixed' && walkLabel(d) === 'Weg (teils Luftlinie)',
+      { val: walkVal(d), expected: km(expected), label: walkLabel(d) });
   }
 
   // ── Kein Wechsel möglich -> "–" ─────────────────────────────────────────
@@ -133,7 +146,7 @@ async function loadWith(walkScript) {
     w.setShowDuration('x', 'nid:5', '30'); // nur Act5 (keine Koordinaten)
     w.switchTab('auswertung');
     t.check('Ohne berechenbare Wechsel zeigt die Strecke "–" (und erklärt, warum).',
-      walkVal(d, 'Fr 18.09') === '–' && d.querySelector('.ausw-block[data-ausw="Fr 18.09"] .ausw-note').textContent.includes('1 besuchter Auftritt ist'));
+      walkVal(d) === '–' && block(d).querySelector('.ausw-note').textContent.includes('1 besuchter Auftritt ist'));
   }
 
   t.finish();

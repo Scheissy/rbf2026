@@ -115,6 +115,12 @@ const { loadApp, createChecker } = require('./test-helpers');
     w.setAuswertungSort('count');
   });
 
+  step('Auswertung: einen Tag ab- und wieder anwählen (per Klick, wie in echter Nutzung)', () => {
+    const dayBtn = [...d.querySelectorAll('.ausw-day-btn')][0];
+    dayBtn.click();
+    dayBtn.click();
+  });
+
   step('In den Settings-Tab (io) wechseln', () => {
     w.switchTab('io');
   });

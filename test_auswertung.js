@@ -2,126 +2,125 @@ const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
 
 // Testdaten (rbf-data.test.js), nid -> Tag / Location:
 //  1 Nova Frequenz Mi Docks | 2 Stahl & Beton Mi Molotow | 3 Kollektiv Nachtfalter Do Prinzenbar
-//  4 Rosa Mercur Do Docks   | 5 Rosa Mercur Fr (TBA, ohne Location) | 6 Blau Neon Fr Molotow
-//  10 Nordlicht Prozession Sa Docks | 11 DJ Mitternacht Sa Molotow
-//  Events: evt-0 Anchor Award Show (Musik, Fr, St. Pauli Theater), evt-1 RBF Podcast Live (Sonstiges, Do, Docks)
+//  4 Rosa Mercur Do Docks   | 6 Blau Neon Fr Molotow      | 8 Funkeninsel Sa Fischauktionshalle
+//  9 Lila Oktober Sa Prinzenbar | 10 Nordlicht Prozession Sa Docks
+const ALL_DAYS = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
 
-const block = (d, id) => d.querySelector(`.ausw-block[data-ausw="${id}"]`);
-const rows = (d, id) => [...block(d, id).querySelectorAll('.ausw-loc')].map(r => ({
-  name: r.querySelector('.ausw-loc-head > span:first-child').textContent,
-  count: parseInt(r.getAttribute('data-count'), 10),
-  width: r.querySelector('.ausw-bar-fill').style.width
-}));
-// Die ersten drei Kennzahlen (Anzahl, Zeit, Ø); die 4. (Strecke) prüft test_walk_distance.js.
-const kpis = (d, id) => [...block(d, id).querySelectorAll('.ausw-kpi')].slice(0, 3).map(k => k.querySelector('.ausw-kpi-val').textContent);
-const summary = (d, id) => rows(d, id).map(r => `${r.name}:${r.count}`).join(', ');
+const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
+const title = d => block(d).querySelector('.io-section-title').textContent;
+const kpis = d => [...block(d).querySelectorAll('.ausw-kpi')].slice(0, 3).map(k => k.querySelector('.ausw-kpi-val').textContent);
+const locNames = d => [...block(d).querySelectorAll('.ausw-loc-head > span:first-child')].map(e => e.textContent).join(' | ');
+const dayBtns = d => [...d.querySelectorAll('.ausw-day-btn')];
+const activeDayLabels = d => dayBtns(d).filter(b => b.classList.contains('active')).map(b => b.dataset.day);
+// Setzt die Tages-Auswahl per simuliertem Klick (nicht direkt appSettings, damit
+// derselbe Weg wie eine echte Nutzung getestet wird). Jeder Klick rendert den
+// gesamten Inhalt neu - Buttons müssen daher nach jedem Klick neu geholt werden.
+function selectDays(d, wantedDays) {
+  ALL_DAYS.forEach(day => {
+    const btn = dayBtns(d).find(b => b.dataset.day === day);
+    const isActive = btn.classList.contains('active');
+    const wanted = wantedDays.includes(day);
+    if (isActive !== wanted) btn.click();
+  });
+}
 
 (async () => {
   const { window: w, document: d, errors } = await loadApp({ trackErrors: true });
   const t = createChecker();
 
-  const open = () => { w.switchTab('kuenstler'); w.switchTab('auswertung'); };
-
-  // ── 1) Tab in der Bottom-Nav ─────────────────────────────────────────────
-  const navIds = [...d.querySelectorAll('.bottomnav .nav-btn')].map(b => b.id);
-  t.check('Bottom-Nav hat 4 Tabs in der Reihenfolge Künstler, Programm, Auswertung, Settings.',
-    JSON.stringify(navIds) === JSON.stringify(['nav-kuenstler', 'nav-programm', 'nav-auswertung', 'nav-io']), navIds);
-
   w.switchTab('auswertung');
-  const visibleViews = ['kuenstler', 'programm', 'auswertung', 'io'].filter(v => !d.getElementById(`view-${v}`).classList.contains('hidden'));
-  t.check('Auswertung-Tab zeigt nur seine eigene View an.', JSON.stringify(visibleViews) === JSON.stringify(['auswertung']), visibleViews);
-  t.check('Nav-Button "Auswertung" ist als aktiv markiert, die anderen nicht.',
-    d.getElementById('nav-auswertung').classList.contains('active') &&
-    !d.getElementById('nav-kuenstler').classList.contains('active') &&
-    !d.getElementById('nav-io').classList.contains('active'));
 
-  // ── 2) Aufbau: immer Gesamt + alle vier Tage ────────────────────────────
-  const blockIds = [...d.querySelectorAll('.ausw-block')].map(b => b.getAttribute('data-ausw'));
-  t.check('Es gibt immer einen Gesamt-Block plus je einen Block pro Festivaltag (Reihenfolge chronologisch).',
-    JSON.stringify(blockIds) === JSON.stringify(['gesamt', 'Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09']), blockIds);
-  t.check('Ohne Eintragungen zeigen alle Blöcke "Noch keine besuchten Auftritte.".',
-    [...d.querySelectorAll('.ausw-block')].every(b => b.textContent.includes('Noch keine besuchten Auftritte')));
+  // ── 1) Tages-Auswahl statt fester Struktur ──────────────────────────────
+  t.check('Es gibt genau 4 Tage-Buttons, in chronologischer Reihenfolge.',
+    dayBtns(d).map(b => b.dataset.day).join(',') === ALL_DAYS.join(','));
+  t.check('Standardmäßig (noch nie gewählt) sind ALLE Tage aktiv - entspricht dem früheren "Gesamt".',
+    JSON.stringify(activeDayLabels(d)) === JSON.stringify(ALL_DAYS));
+  t.check('Es gibt nur noch EINEN Auswertungs-Bereich (keine 5 separaten Blöcke mehr).',
+    d.querySelectorAll('.ausw-block').length === 1);
+  t.check('Mit allen 4 Tagen aktiv lautet der Titel "Gesamt".', title(d) === 'Gesamt', title(d));
 
-  // ── 3) Definition "besucht": Dauer ODER Bewertung ───────────────────────
-  w.setShowDuration('x', 'nid:1', '45');   // nur Dauer            (Mi, Docks)
-  w.setShowRating('x', 'nid:2', 4);        // nur Bewertung        (Mi, Molotow)
-  w.togglePlanFlag('x', 'nid:3');          // nur Ziel-Flag        -> zählt NICHT
-  w.setSeen('Kollektiv Nachtfalter', 'ja'); // Künstler "gesehen"  -> zählt NICHT (Auftritts-Ebene!)
-  w.setShowDuration('x', 'nid:4', '60');   // Dauer UND Bewertung  (Do, Docks) -> zählt EINMAL
+  // ── 2) Regressionswerte: mit ALLEN Tagen identisch zum früheren "Gesamt" ──
+  w.setShowRating('x', 'nid:2', 4);
+  w.setShowDuration('x', 'nid:4', '60');
   w.setShowRating('x', 'nid:4', 5);
-  w.setShowRating('x', 'nid:5', 3);        // TBA ohne Location    (Fr)
-  w.setShowRating('x', 'nid:6', 2);        //                      (Fr, Molotow)
-  w.setShowDuration('x', 'nid:11', '30');  //                      (Sa, Molotow)
-  open();
+  w.setShowRating('x', 'nid:6', 2);
+  w.setShowDuration('x', 'nid:11', '30');
+  w.renderAuswertung();
+  t.check('Mit voller Auswahl: 4 besuchte Auftritte, 1h 30min, Ø 3.7.',
+    JSON.stringify(kpis(d)) === JSON.stringify(['4', '1h 30min', '3.7']), kpis(d));
+  t.check('Mit voller Auswahl: Location-Reihenfolge wie zuvor (Molotow vor Docks).',
+    locNames(d) === 'Molotow | Docks', locNames(d));
 
-  t.check('Gesamt: besuchte Auftritte = Dauer ODER Bewertung (6); Ziel-Flag und Künstler-"gesehen" zählen nicht; Dauer+Bewertung zählt nur einmal.',
-    kpis(d, 'gesamt')[0] === '6', kpis(d, 'gesamt'));
-  t.check('Gesamt: Zeit vor Ort = Summe der Dauern (45+60+30 = 2h 15min).', kpis(d, 'gesamt')[1] === '2h 15min', kpis(d, 'gesamt'));
-  t.check('Gesamt: Ø Bewertung nur über bewertete Auftritte ((4+5+3+2)/4 = 3.5).', kpis(d, 'gesamt')[2] === '3.5', kpis(d, 'gesamt'));
+  // ── 3) Das konkrete Beispiel aus der Anfrage: NUR Mi + Sa auswählen ─────
+  // Übrig bleiben nid:2 (Mi, Molotow, ★4) und nid:11 (Sa, Molotow, 30 Min);
+  // nid:4 (Do, Docks) und nid:6 (Fr, Molotow) fallen komplett weg.
+  selectDays(d, ['Mi 16.09', 'Sa 19.09']);
+  t.check('Titel zeigt die Auswahl an ("Mi 16.09 + Sa 19.09"), chronologisch (nicht Klickreihenfolge).',
+    title(d) === 'Mi 16.09 + Sa 19.09', title(d));
+  t.check('Nur Mi+Sa ausgewählt: 2 besuchte Auftritte (Do/Fr fallen komplett raus), 30 Min, Ø 4.0.',
+    JSON.stringify(kpis(d)) === JSON.stringify(['2', '30 Min', '4.0']), kpis(d));
+  t.check('Locations werden über die AUSGEWÄHLTEN Tage hinweg summiert: Molotow (Mi+Sa) steht als EIN Eintrag mit Anzahl 2, nicht als zwei separate Zeilen.',
+    locNames(d) === 'Molotow' && block(d).querySelector('.ausw-loc').getAttribute('data-count') === '2', locNames(d));
+  t.check('Docks (nur der Do-Auftritt) verschwindet komplett aus der Liste, weil Donnerstag abgewählt ist.',
+    !locNames(d).includes('Docks'));
 
-  // ── 4) Location-Ranking ────────────────────────────────────────────────
-  t.check('Gesamt-Ranking nach Häufigkeit absteigend, Auftritte ohne Location als "Ohne Location".',
-    summary(d, 'gesamt') === 'Molotow:3, Docks:2, Ohne Location:1', summary(d, 'gesamt'));
-  t.check('Balken sind relativ zur häufigsten Location (100 % / 67 % / 33 %).',
-    JSON.stringify(rows(d, 'gesamt').map(r => r.width)) === JSON.stringify(['100%', '67%', '33%']), rows(d, 'gesamt').map(r => r.width));
+  // ── 4) Nur ein einzelner Tag ─────────────────────────────────────────────
+  selectDays(d, ['Fr 18.09']);
+  t.check('Ein einzelner ausgewählter Tag zeigt dessen Namen als Titel (kein "+").', title(d) === 'Fr 18.09', title(d));
+  t.check('Nur Fr: 1 besuchter Auftritt (Blau Neon, ★2).', JSON.stringify(kpis(d)) === JSON.stringify(['1', '–', '2.0']), kpis(d));
 
-  // ── 5) Aufschlüsselung nach Tagen ───────────────────────────────────────
-  t.check('Mi: Docks 1, Molotow 1 (bei Gleichstand alphabetisch).', summary(d, 'Mi 16.09') === 'Docks:1, Molotow:1', summary(d, 'Mi 16.09'));
-  t.check('Do: nur Docks 1 - Prinzenbar (nur Ziel-Flag) taucht nicht auf.', summary(d, 'Do 17.09') === 'Docks:1', summary(d, 'Do 17.09'));
-  t.check('Fr: Molotow 1, Ohne Location 1.', summary(d, 'Fr 18.09') === 'Molotow:1, Ohne Location:1', summary(d, 'Fr 18.09'));
-  t.check('Sa: nur Molotow 1 (Docks-Auftritt ohne Eintrag zählt nicht).', summary(d, 'Sa 19.09') === 'Molotow:1', summary(d, 'Sa 19.09'));
-  t.check('Tages-Kennzahlen: Do = 1 Auftritt, 1h, Ø 5.0; Sa ohne Bewertung zeigt "–" beim Ø.',
-    JSON.stringify(kpis(d, 'Do 17.09')) === JSON.stringify(['1', '1h', '5.0']) &&
-    JSON.stringify(kpis(d, 'Sa 19.09')) === JSON.stringify(['1', '30 Min', '–']), { do: kpis(d, 'Do 17.09'), sa: kpis(d, 'Sa 19.09') });
+  // ── 5) Kein Tag ausgewählt: klare Meldung statt leerer/verwirrender Ansicht ─
+  selectDays(d, []);
+  t.check('Kein Tag ausgewählt -> Hinweistext statt einer (leeren) Auswertung.',
+    !d.querySelector('.ausw-block') && d.getElementById('auswertungContent').textContent.includes('mindestens einen Tag'));
+  t.check('Kein JS-Fehler bei komplett leerer Auswahl.', errors.length === 0, errors);
+  errors.length = 0;
 
-  // ── 6) Sonderveranstaltungen ────────────────────────────────────────────
-  w.setShowRating('x', 'nid:evt-1', 4); // RBF Podcast Live (Do, Docks)
-  open();
-  t.check('Ein bewertetes Event zählt wie ein Auftritt (Docks Gesamt 3, Do: 2 besucht).',
-    summary(d, 'gesamt') === 'Docks:3, Molotow:3, Ohne Location:1' && kpis(d, 'Do 17.09')[0] === '2', summary(d, 'gesamt'));
+  // ── 6) Zurück auf alle Tage ──────────────────────────────────────────────
+  selectDays(d, ALL_DAYS);
+  t.check('Erneutes Aktivieren aller Tage stellt "Gesamt" wieder her.', title(d) === 'Gesamt' && JSON.stringify(kpis(d)) === JSON.stringify(['4', '1h 30min', '3.7']));
 
-  w.toggleSetting('showMusicEvents', false);
-  w.setShowRating('x', 'nid:evt-0', 5); // Anchor Award Show (Musik, Fr, St. Pauli Theater)
-  open();
-  t.check('Die Kategorie-Checkboxen der Programm-Übersicht beeinflussen die Auswertung nicht (Musik-Event bleibt drin).',
-    summary(d, 'Fr 18.09').includes('St. Pauli Theater:1'), summary(d, 'Fr 18.09'));
-  w.toggleSetting('showMusicEvents', true);
+  // ── 7) Scroll-Position bleibt bei jedem Klick erhalten ──────────────────
+  const view = d.getElementById('view-auswertung');
+  view.scrollTop = 555;
+  dayBtns(d).find(b => b.dataset.day === 'Mi 16.09').click();
+  t.check('Beim Umschalten der Tage springt die Ansicht nicht nach oben.', view.scrollTop === 555, view.scrollTop);
+  selectDays(d, ALL_DAYS);
 
-  w.toggleSetting('showRbfEvents', false);
-  open();
-  t.check('Globaler Schalter "RBF-Sonderveranstaltungen" aus -> Events verschwinden aus der Auswertung.',
-    summary(d, 'gesamt') === 'Molotow:3, Docks:2, Ohne Location:1' && !d.getElementById('auswertungContent').textContent.includes('St. Pauli Theater'), summary(d, 'gesamt'));
-  w.toggleSetting('showRbfEvents', true);
-
-  // ── 7) Unabhängig von Filtern / Ausblenden ─────────────────────────────
-  w.toggleLocVisibility('Docks');       // Location dauerhaft aus der Programm-Übersicht ausgeblendet
-  w.toggleHidden('Nova Frequenz');      // Künstler ausgeblendet
-  open();
-  t.check('Dauerhaft ausgeblendete Locations und ausgeblendete Künstler verfälschen die Auswertung nicht.',
-    summary(d, 'Mi 16.09') === 'Docks:1, Molotow:1', summary(d, 'Mi 16.09'));
-  w.resetLocManage();
-  w.toggleHidden('Nova Frequenz');
-
-  // ── 8) Live-Aktualisierung beim Tab-Wechsel ────────────────────────────
-  w.setShowRating('x', 'nid:5', 3); // Bewertung wieder entfernt (gleicher Wert = zurücksetzen)
-  open();
-  t.check('Änderungen in anderen Tabs sind beim nächsten Öffnen der Auswertung sichtbar (Fr: "Ohne Location" weg).',
-    !summary(d, 'Fr 18.09').includes('Ohne Location'), summary(d, 'Fr 18.09'));
-  w.setShowRating('x', 'nid:5', 3);
-
-  // ── 9) Sonderzeichen im Location-Namen ──────────────────────────────
-  w.setShowRating('x', 'nid:7', 4); // Grauzone Sieben, "Uebel & Gefährlich"
-  open();
-  const names = [...block(d, 'Fr 18.09').querySelectorAll('.ausw-loc-head > span:first-child')].map(e => e.textContent);
-  t.check('Location mit "&" wird korrekt (escaped) dargestellt.', names.includes('Uebel & Gefährlich'), names);
-
-  // ── 10) Persistenz: nach echtem Neustart identische Auswertung ─────────
-  w.saveToStorage();
-  const before = summary(d, 'gesamt');
+  // ── 8) Persistenz über einen echten Neustart ────────────────────────────
+  selectDays(d, ['Mi 16.09', 'Sa 19.09']);
   const reloaded = await reloadWithState(w, ['rbf2026_v1']);
   reloaded.window.switchTab('auswertung');
-  t.check('Nach einem simulierten Neustart liefert die Auswertung dasselbe Ergebnis.',
-    summary(reloaded.document, 'gesamt') === before, { vorher: before, nachher: summary(reloaded.document, 'gesamt') });
+  t.check('Die gewählten Tage werden gespeichert und nach einem Neustart identisch wiederhergestellt.',
+    JSON.stringify(activeDayLabels(reloaded.document)) === JSON.stringify(['Mi 16.09', 'Sa 19.09']) && title(reloaded.document) === 'Mi 16.09 + Sa 19.09',
+    activeDayLabels(reloaded.document));
+
+  // ── 9) Eine bewusst leere Auswahl bleibt nach Neustart leer ─────────────
+  {
+    const { window: w2, document: d2 } = await loadApp();
+    w2.switchTab('auswertung');
+    selectDays(d2, []);
+    const reloaded2 = await reloadWithState(w2, ['rbf2026_v1']);
+    reloaded2.window.switchTab('auswertung');
+    t.check('Eine bewusst leere Auswahl bleibt nach einem Neustart leer (kein automatisches Zurückfallen auf "alle Tage").',
+      activeDayLabels(reloaded2.document).length === 0 && !reloaded2.document.querySelector('.ausw-block'));
+  }
+
+  // ── 10) Datenmigration: gespeicherte Tage existieren nicht mehr ────────
+  // (z.B. nach einem rbf-data.js-Update mit anderen Tagsnamen) - dann auf
+  // "alle Tage" zurückfallen statt eine für den Nutzer unerklärliche Leerauswahl
+  // zu zeigen, die er so nie getroffen hat.
+  {
+    const { window: w3, document: d3 } = await loadApp();
+    w3.localStorage.setItem('rbf2026_v1', JSON.stringify({
+      ratings: [], auftritte: [], showRatings: {}, showDurations: {}, planFlags: {}, hiddenEvents: {},
+      settings: { auswertungDays: ['Fantasietag 99.99'] }
+    }));
+    w3.loadFromStorage();
+    w3.switchTab('auswertung');
+    t.check('Sind ALLE gespeicherten Tage ungültig (Datenupdate), fällt die Auswahl auf "alle Tage" zurück statt leer zu bleiben.',
+      JSON.stringify(activeDayLabels(d3)) === JSON.stringify(ALL_DAYS) && title(d3) === 'Gesamt', activeDayLabels(d3));
+  }
 
   t.check('Keine JS-Fehler während des gesamten Ablaufs.', errors.length === 0, errors);
   t.finish();

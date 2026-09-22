@@ -4,12 +4,19 @@ const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
 //  1 Docks Mi | 2 Molotow Mi | 4 Rosa Mercur Do Docks | 6 Blau Neon Fr Molotow | 7 Uebel & Gefährlich Fr
 //  10 Nordlicht Prozession Sa Docks | 11 DJ Mitternacht Sa Molotow
 
-const block = (d, id) => d.querySelector(`.ausw-block[data-ausw="${id}"]`);
-const distRows = (d, id) => [...block(d, id).querySelectorAll('.ausw-dist-row')].map(r => ({
+const ALL_DAYS = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
+const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
+function selectDays(d, wantedDays) {
+  ALL_DAYS.forEach(day => {
+    const dayBtn = [...d.querySelectorAll('.ausw-day-btn')].find(b => b.dataset.day === day);
+    if (dayBtn.classList.contains('active') !== wantedDays.includes(day)) dayBtn.click();
+  });
+}
+const distRows = d => [...block(d).querySelectorAll('.ausw-dist-row')].map(r => ({
   stars: +r.getAttribute('data-stars'), count: +r.getAttribute('data-count'), width: r.querySelector('.ausw-bar-fill').style.width
 }));
-const distText = (d, id) => distRows(d, id).map(r => `${r.stars}:${r.count}`).join(', ');
-const locRows = (d, id) => [...block(d, id).querySelectorAll('.ausw-loc')].map(r => ({
+const distText = d => distRows(d).map(r => `${r.stars}:${r.count}`).join(', ');
+const locRows = d => [...block(d).querySelectorAll('.ausw-loc')].map(r => ({
   name: r.querySelector('.ausw-loc-head > span:first-child').textContent,
   avg: r.getAttribute('data-avg-rating'),
   main: r.querySelector('.ausw-loc-main').textContent,
@@ -36,23 +43,26 @@ const btn = (d, mode) => d.querySelector(`.ausw-sort-btn[data-sort="${mode}"]`);
 
   // ── 0) Reihenfolge im Block: Locations VOR der Bewertungsverteilung ────
   {
-    const html = block(d, 'gesamt').innerHTML;
+    const html = block(d).innerHTML;
     t.check('Die Bewertungsverteilung steht unterhalb des Locations-Abschnitts (nicht darüber).',
       html.indexOf('📍 Locations') !== -1 && html.indexOf('📍 Locations') < html.indexOf('⭐ Bewertungsverteilung'));
   }
 
   // ── 1) Bewertungsverteilung: Gesamt ─────────────────────────────────────
   t.check('Verteilung zeigt immer alle 5 Stufen (5→1), auch wenn eine Stufe 0x vorkommt.',
-    distRows(d, 'gesamt').map(r => r.stars).join(',') === '5,4,3,2,1');
+    distRows(d).map(r => r.stars).join(',') === '5,4,3,2,1');
   t.check('Gesamt: 5★=3, 4★=1, 3★=1, 2★=1, 1★=0 (unbewertete "besuchte" Docks/Mi zählt NICHT mit).',
-    distText(d, 'gesamt') === '5:3, 4:1, 3:1, 2:1, 1:0', distText(d, 'gesamt'));
+    distText(d) === '5:3, 4:1, 3:1, 2:1, 1:0', distText(d));
   t.check('Balken sind relativ zur häufigsten Bewertungsstufe (5★ = 100 %, die anderen kleiner, 1★ = 0 %).',
-    distRows(d, 'gesamt')[0].width === '100%' && distRows(d, 'gesamt')[4].width === '0%', distRows(d, 'gesamt'));
+    distRows(d)[0].width === '100%' && distRows(d)[4].width === '0%', distRows(d));
 
   // ── 2) Verteilung je Tag ─────────────────────────────────────────────────
-  t.check('Mi: nur die Molotow-Bewertung (3★) zählt, Docks (unbewertet, nur Dauer) fließt nicht ein.',
-    distText(d, 'Mi 16.09') === '5:0, 4:0, 3:1, 2:0, 1:0', distText(d, 'Mi 16.09'));
-  t.check('Fr: zwei Bewertungen (5★, 4★).', distText(d, 'Fr 18.09') === '5:1, 4:1, 3:0, 2:0, 1:0', distText(d, 'Fr 18.09'));
+  selectDays(d, ['Mi 16.09']);
+  t.check('Nur Mi ausgewählt: nur die Molotow-Bewertung (3★) zählt, Docks (unbewertet, nur Dauer) fließt nicht ein.',
+    distText(d) === '5:0, 4:0, 3:1, 2:0, 1:0', distText(d));
+  selectDays(d, ['Fr 18.09']);
+  t.check('Nur Fr ausgewählt: zwei Bewertungen (5★, 4★).', distText(d) === '5:1, 4:1, 3:0, 2:0, 1:0', distText(d));
+  selectDays(d, ALL_DAYS);
 
   // ── 3) Ohne jede Bewertung: Hinweistext statt leerer Liste ─────────────
   {
@@ -60,7 +70,7 @@ const btn = (d, mode) => d.querySelector(`.ausw-sort-btn[data-sort="${mode}"]`);
     w2.setShowDuration('x', 'nid:1', '20'); // besucht, aber unbewertet
     w2.switchTab('auswertung');
     t.check('Besuchte, aber unbewertete Auftritte: "Noch keine Bewertungen abgegeben." statt einer leeren Verteilung.',
-      block(d2, 'gesamt').textContent.includes('Noch keine Bewertungen abgegeben.') && !d2.querySelector('.ausw-dist-row'));
+      block(d2).textContent.includes('Noch keine Bewertungen abgegeben.') && !d2.querySelector('.ausw-dist-row'));
   }
 
   // ── 4) Dritte Sortier-Option "Bewertung" ────────────────────────────────
@@ -71,8 +81,8 @@ const btn = (d, mode) => d.querySelector(`.ausw-sort-btn[data-sort="${mode}"]`);
 
   // Ø je Location (Gesamt): Docks (5+5)/2=5.0, Molotow (3+5+2)/3=3.33, Uebel 4.0.
   t.check('Gesamt nach Bewertung: Docks (Ø 5.0) vor Uebel (Ø 4.0) vor Molotow (Ø 3.3).',
-    locNames(d, 'gesamt') === 'Docks | Uebel & Gefährlich | Molotow', locNames(d, 'gesamt'));
-  const rows = locRows(d, 'gesamt');
+    locNames(d) === 'Docks | Uebel & Gefährlich | Molotow', locNames(d));
+  const rows = locRows(d);
   t.check('Bewertungs-Modus: Haupt-Wert ist der Mittelwert ("5.0"), Nebenwert die Anzahl der BEWERTUNGEN ("2×", nicht aller 3 Besuche - einer davon ist unbewertet).', rows[0].main === '5.0' && rows[0].meta === '2×', rows[0]);
   t.check('Balken sind ABSOLUT auf der 1-5-Skala (Docks Ø5.0 = 100 %, Molotow Ø3.33 = 67 %) - nicht relativ zum Erstplatzierten.',
     rows[0].width === '100%' && rows[2].width === '67%', rows.map(r => r.width));
@@ -85,7 +95,7 @@ const btn = (d, mode) => d.querySelector(`.ausw-sort-btn[data-sort="${mode}"]`);
     w3.setShowRating('x', 'nid:2', 4);      // Molotow, bewertet
     w3.switchTab('auswertung');
     w3.setAuswertungSort('rating');
-    const r3 = locRows(d3, 'gesamt');
+    const r3 = locRows(d3);
     t.check('Unbewertete Location steht nach Bewertungs-Sortierung ganz unten und zeigt "–".',
       r3[r3.length - 1].name === 'Docks' && r3[r3.length - 1].main === '–' && r3[r3.length - 1].width === '0%', r3);
   }
@@ -99,8 +109,8 @@ const btn = (d, mode) => d.querySelector(`.ausw-sort-btn[data-sort="${mode}"]`);
   const reloaded = await reloadWithState(w, ['rbf2026_v1']);
   reloaded.window.switchTab('auswertung');
   t.check('Die Sortierung "Bewertung" wird gespeichert und nach einem Neustart wiederhergestellt.',
-    btn(reloaded.document, 'rating').classList.contains('active') && locNames(reloaded.document, 'gesamt') === 'Docks | Uebel & Gefährlich | Molotow',
-    locNames(reloaded.document, 'gesamt'));
+    btn(reloaded.document, 'rating').classList.contains('active') && locNames(reloaded.document) === 'Docks | Uebel & Gefährlich | Molotow',
+    locNames(reloaded.document));
 
   // ── 8) Nur die Auftritts-Bewertung fließt ein, nicht die Künstler-Bewertung ─
   {
@@ -109,7 +119,7 @@ const btn = (d, mode) => d.querySelector(`.ausw-sort-btn[data-sort="${mode}"]`);
     w4.setShowDuration('x', 'nid:1', '20'); // Auftritt besucht, aber ohne Auftritts-Bewertung
     w4.switchTab('auswertung');
     t.check('Eine reine Künstler-Bewertung (Promo/Listening) fließt NICHT in die Verteilung/Location-Bewertung ein.',
-      block(d4, 'gesamt').textContent.includes('Noch keine Bewertungen abgegeben.'));
+      block(d4).textContent.includes('Noch keine Bewertungen abgegeben.'));
   }
 
   t.check('Keine JS-Fehler während des gesamten Ablaufs.', errors.length === 0, errors);

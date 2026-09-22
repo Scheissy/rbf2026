@@ -245,6 +245,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 /* ── Auswertung-Tab ── */
 .ausw-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 4px; }
 .ausw-header-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.ausw-daypicker { padding: 4px 14px 12px; }
 .ausw-kpis { display: flex; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
 
 .ausw-kpi { flex: 1; min-width: 90px; background: var(--surface2); border-radius: 8px; padding: 8px 10px; }
@@ -1033,6 +1034,30 @@ function isShowVisited(a) {
 function auswertungEntries() {
   return auftritte.concat(appSettings.showRbfEvents ? rbfEvents : []);
 }
+// Dynamische Tages-Auswahl: welche Tage fließen in DIE EINE Übersicht ein.
+// undefined (noch nie gewählt) -> Default: alle Tage (= "Gesamt"). Ändert sich
+// DAY_ORDER durch ein Datenupdate so stark, dass NICHTS Gespeichertes mehr
+// gültig ist, fällt es ebenfalls auf "alle Tage" zurück, statt eine technische
+// Leerauswahl zu zeigen, die der Nutzer so nie getroffen hat. Eine bewusst vom
+// Nutzer gewählte leere Auswahl (explizit alle Tage abgewählt) bleibt dagegen leer.
+function auswertungSelectedDays() {
+  const stored = appSettings.auswertungDays;
+  if (!Array.isArray(stored)) return DAY_ORDER.slice();
+  const valid = stored.filter(day => DAY_ORDER.includes(day));
+  return (valid.length === 0 && stored.length > 0) ? DAY_ORDER.slice() : valid;
+}
+function toggleAuswertungDay(btn) {
+  btn.classList.toggle('active');
+  const active = [...btn.parentElement.querySelectorAll('.ausw-day-btn')].filter(b => b.classList.contains('active')).map(b => b.dataset.day);
+  appSettings.auswertungDays = DAY_ORDER.filter(day => active.includes(day)); // chronologisch, unabhängig von der Klickreihenfolge
+  saveToStorage();
+  renderAuswertung();
+}
+function auswertungSelectionTitle(days) {
+  if (days.length === 0) return 'Auswahl';
+  if (days.length === DAY_ORDER.length) return 'Gesamt';
+  return days.join(' + ');
+}
 // Sortierung des Location-Rankings: Hauptkriterium + Tie-Breaker.
 //   'count':    Häufigkeit, bei Gleichstand Gesamtdauer, danach Name
 //   'duration': Gesamtdauer, bei Gleichstand Häufigkeit, danach Name
@@ -1200,25 +1225,32 @@ function auswertungBlockHTML(title, id, entries) {
 function renderAuswertung() {
   const el = document.getElementById('auswertungContent');
   if (!el) return;
-  const entries = auswertungEntries();
+  const view = document.getElementById('view-auswertung');
+  const scroll = view ? view.scrollTop : 0; // Scroll-Position erhalten (Neu-Rendern bei jedem Klick)
+  const selectedDays = auswertungSelectedDays();
+  const entries = auswertungEntries().filter(a => selectedDays.includes(a.day));
   let html = `<div class="ausw-header">
     <div class="ausw-header-title">📊 Auswertung</div>
     <button type="button" class="info-icon-btn" onclick="event.stopPropagation();openAuswertungInfoModal()" title="Wie funktioniert die Auswertung?" aria-label="Erklärung zur Auswertung">ⓘ</button>
   </div>`;
-  const mode = auswertungSortMode();
-  html += `<div class="ausw-sort"><span class="ausw-sort-label">📍 Locations sortieren nach</span>
-      <div class="ausw-sort-btns">
-        <button class="ausw-sort-btn${mode === 'count' ? ' active' : ''}" data-sort="count" onclick="setAuswertungSort('count')">Häufigkeit</button>
-        <button class="ausw-sort-btn${mode === 'duration' ? ' active' : ''}" data-sort="duration" onclick="setAuswertungSort('duration')">Dauer</button>
-        <button class="ausw-sort-btn${mode === 'rating' ? ' active' : ''}" data-sort="rating" onclick="setAuswertungSort('rating')">Bewertung</button>
-      </div></div>
-    <div class="ausw-note">Bei Gleichstand zählt die jeweils andere Größe, danach der Name.</div>`;
-  html += auswertungBlockHTML('Gesamt', 'gesamt', entries);
-  DAY_ORDER.forEach(day => { html += auswertungBlockHTML(day, day, entries.filter(a => a.day === day)); });
-  // Scroll-Position erhalten (Pixel-Offset): der Umschalter wird neu gerendert,
-  // der Nutzer soll nicht nach oben springen.
-  const view = document.getElementById('view-auswertung');
-  const scroll = view ? view.scrollTop : 0;
+  html += `<div class="ausw-daypicker"><span class="ausw-sort-label">📅 Tage auswählen</span>
+      <div class="day-btns">${DAY_ORDER.map(day => `<button type="button" class="day-btn ausw-day-btn${selectedDays.includes(day) ? ' active' : ''}" data-day="${escapeHtml(day)}" onclick="toggleAuswertungDay(this)">${escapeHtml(day)}</button>`).join('')}</div>
+    </div>`;
+  if (selectedDays.length === 0) {
+    html += `<div class="ausw-empty">Kein Tag ausgewählt - bitte mindestens einen Tag antippen.</div>`;
+  } else {
+    const mode = auswertungSortMode();
+    html += `<div class="ausw-sort"><span class="ausw-sort-label">📍 Locations sortieren nach</span>
+        <div class="ausw-sort-btns">
+          <button class="ausw-sort-btn${mode === 'count' ? ' active' : ''}" data-sort="count" onclick="setAuswertungSort('count')">Häufigkeit</button>
+          <button class="ausw-sort-btn${mode === 'duration' ? ' active' : ''}" data-sort="duration" onclick="setAuswertungSort('duration')">Dauer</button>
+          <button class="ausw-sort-btn${mode === 'rating' ? ' active' : ''}" data-sort="rating" onclick="setAuswertungSort('rating')">Bewertung</button>
+        </div></div>
+      <div class="ausw-note">Bei Gleichstand zählt die jeweils andere Größe, danach der Name.</div>`;
+    html += auswertungBlockHTML(auswertungSelectionTitle(selectedDays), 'auswahl', entries);
+  }
+  // Scroll-Position erhalten (Pixel-Offset): der Inhalt wird bei jeder Interaktion
+  // (Tage-/Sortier-Wahl) komplett neu gerendert, der Nutzer soll nicht nach oben springen.
   el.innerHTML = html;
   if (view) view.scrollTop = scroll;
 }

@@ -42,7 +42,7 @@ const { createChecker } = require('./test-helpers');
   w.loadFromStorage();
   w.switchTab('auswertung');
   t.check('Speichern/Laden-Zyklus funktioniert in der Preview (Auswertung zeigt den besuchten Auftritt).',
-    d.querySelector('.ausw-block[data-ausw="gesamt"] .ausw-kpi-val').textContent === '1');
+    d.querySelector('.ausw-block[data-ausw="auswahl"] .ausw-kpi-val').textContent === '1');
   t.check('Keine JS-Fehler nach Speichern/Laden/Tab-Wechsel.', errors.length === 0, errors);
 
   fs.unlinkSync(out);
