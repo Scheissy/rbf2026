@@ -26,6 +26,7 @@ mit der Zeit ihren Nutzen.
 | `test_reset_time_independence.js` | "Filter zurücksetzen" liefert am selben Tag unabhängig von der Uhrzeit immer denselben Zustand. |
 | `test_special_char_rating_bug.js` | Regressionstest für den Escaping-Bug bei Künstlernamen mit Apostroph (Bewertung + "Gesehen" in der Programm-Übersicht). |
 | `test_rename_rescue.js` | Case-insensitive Rettung von Bewertung/Gesehen-Status bei reiner Schreibweisen-Änderung eines Künstlernamens (z.B. "Meller" -> "MELLER"), inkl. Sicherheits-Bremse bei Mehrdeutigkeit. |
+| `test_prog_scroll_anchor.js` | Scroll-Anker-Erhaltung in der Programm-Übersicht bei Filteränderungen (analog zur Künstler-Übersicht): Anker bleibt exakt an derselben Position, wenn er weiter sichtbar ist; wird er herausgefiltert, richtet sich die Liste am zeitlich nächsten NOCH sichtbaren Nachbarn aus (vorwärts UND rückwärts gesucht) statt nach oben zu springen; Tages-Header werden bei der Anker-Wahl übersprungen; bei komplett leerer Liste sauberer Fallback auf 0; Regressionsschutz für den gemeldeten Bug (Ziel-Flag bei aktivem "Nur als Ziel markierte"-Filter). |
 | `test_kuenstler_scroll_anchor.js` | Anker-basierte Scroll-Erhaltung in der Künstler-Übersicht bei Filteränderungen: Scroll bleibt auf dem vorher sichtbaren Künstler ausgerichtet (auch wenn sich die Ergebnismenge ändert), fällt auf scrollTop=0 zurück, wenn dieser Künstler rausgefiltert wird. |
 | `test_scroll_container_css.js` | Regressions-Schutz für `min-height: 0` auf `#artistList`/`.prog-list` (verschachtelte Flexbox-Scroll-Falle, s. Prompt-Datei) - reiner CSS-Text-Check, kein Layout-Test (jsdom berechnet kein echtes Flexbox-Layout). |
 | `test_country_abbreviation.js` | `shortenHerkunft()`: Länder-Abkürzungen (inkl. zusammengesetzter Länder mit "/"), nur in der Künstler-, nicht in der Programm-Übersicht. Nutzt eine EIGENE, kleine Testdatendatei (volle Ländernamen) statt `rbf-data.test.js`. |
@@ -42,7 +43,7 @@ mit der Zeit ihren Nutzen.
 ## Hilfsdateien
 
 - `test-helpers.js` - gemeinsame Helfer (`loadApp()` inkl. Option `walkScript`, `reloadWithState()`,
-  `createChecker()`). Alle 28 Testdateien oben nutzen diese Helfer bereits
+  `createChecker()`). Alle 29 Testdateien oben nutzen diese Helfer bereits
   (Migration in 8 Runden abgeschlossen) - Boilerplate wurde dabei um
   durchschnittlich ca. 43 % pro Datei reduziert, die eigentliche Prüf-Logik
   blieb inhaltlich unverändert.

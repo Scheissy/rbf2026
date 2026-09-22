@@ -62,6 +62,15 @@ const { loadApp, createChecker } = require('./test-helpers');
     w.toggleProgFiltersPanel();
   });
 
+  step('Ziel-Flag umschalten, während "Nur als Ziel markierte" aktiv ist (Scroll-Anker-Erhaltung)', () => {
+    const wasPlanned = d.getElementById('fProgPlanned').checked;
+    d.getElementById('fProgPlanned').checked = true;
+    w.togglePlanFlag('x', 'nid:1');
+    w.togglePlanFlag('x', 'nid:1');
+    d.getElementById('fProgPlanned').checked = wasPlanned;
+    w.renderProg();
+  });
+
   step('Sonderveranstaltung ausblenden und wieder einblenden', () => {
     const entry = w.allProgEntries().find(e => e.isEvent);
     if (!entry) throw new Error('Kein Event in den Testdaten gefunden');

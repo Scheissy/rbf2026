@@ -2916,7 +2916,7 @@ function handleInstallBackdropClick(e) {
 // seine sichtbaren Zeilen aktualisiert werden, nicht nur die angeklickte.
 let progRidsByName = {};
 
-function renderProg() {
+function renderProgCore() {
   const list = document.getElementById('progList');
   openProgRid = null;
   progRidsByName = {};
@@ -2952,7 +2952,10 @@ function renderProg() {
     // Sonderveranstaltungen über hiddenEvents[a.nid] - beide teilen sich
     // dieselbe Optik (Badge, gedimmte Zeile) und denselben Filter-Haken oben.
     const isHidden = (d && d.ausgeblendet) || (a.isEvent && !!hiddenEvents[a.nid]);
-    html += `<div class="prog-item${isHidden ? ' prog-item-hidden' : ''}" onclick="toggleProgRating('${rid}')">
+    // data-skey: stabiler Zeilen-Schlüssel für die Scroll-Anker-Erhaltung in
+    // renderProg() (siehe dort) - im Gegensatz zu "rid" bleibt er unabhängig
+    // von der Position in der (durch Filter veränderlichen) Liste gleich.
+    html += `<div class="prog-item${isHidden ? ' prog-item-hidden' : ''}" data-skey="${escapeHtml(skey)}" onclick="toggleProgRating('${rid}')">
       <div class="prog-time-col">
         <div class="prog-time-val">${a.time ? a.time + (a.endTime ? `<br><span style="opacity:.55;font-size:11px">–${a.endTime}</span>` : '') : '<span style="opacity:.55">TBA</span>'}</div>
         ${planFlagHTML(rid, skey)}
@@ -3000,6 +3003,59 @@ function renderProg() {
   });
   list.innerHTML = html;
   saveFilterState();
+}
+// Ersetzt die frühere direkte Programm-Liste-Renderfunktion: hält die
+// Scroll-Position am selben Auftritt fest, auch wenn sich durch eine
+// Filteränderung die Zusammensetzung der Liste ändert (Analogon zu
+// renderKuenstlerPreservingAnchor() für die Künstler-Übersicht). Da praktisch
+// jede Filter-UND Status-Änderung (Bewertung, Ziel-Flag, Ausblenden, ...) über
+// diese eine Funktion läuft, profitieren alle Aufrufer automatisch - ohne
+// jede einzelne Stelle im Code einzeln umstellen zu müssen.
+function renderProg() {
+  const list = document.getElementById('progList');
+  const listRect = list.getBoundingClientRect();
+  let anchorSkey = null, anchorOffset = 0;
+  for (const item of list.children) {
+    if (!item.classList || !item.classList.contains('prog-item')) continue;
+    const r = item.getBoundingClientRect();
+    if (r.bottom > listRect.top) {
+      anchorSkey = item.dataset.skey;
+      anchorOffset = r.top - listRect.top;
+      break;
+    }
+  }
+  // Chronologische Referenzreihenfolge (identisch zur Sortierung in
+  // renderProgCore, aber bewusst über ALLE Einträge statt der gefilterten
+  // Liste) - dient nur dazu, bei rausgefiltertem Anker den zeitlich nächsten
+  // NOCH sichtbaren Nachbarn zu finden, unabhängig davon, welcher Filter sich
+  // gerade geändert hat.
+  const chronological = allProgEntries().slice()
+    .sort((a, b) => dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.time) - timeSortValue(b.time) || a.name.localeCompare(b.name));
+  const anchorIndex = anchorSkey ? chronological.findIndex(a => showKey(a) === anchorSkey) : -1;
+
+  renderProgCore();
+
+  const findItem = skey => [...list.children].find(el => el.classList && el.classList.contains('prog-item') && el.dataset.skey === skey);
+  let target = anchorSkey ? findItem(anchorSkey) : null;
+  // Anker selbst wurde herausgefiltert: abwechselnd einen späteren und einen
+  // früheren zeitlichen Nachbarn probieren, bis einer gefunden wird, der die
+  // neuen Filter noch erfüllt - so bleibt immer ein Eintrag "aus der
+  // zeitlichen Umgebung" sichtbar, statt ganz nach oben zu springen.
+  if (!target && anchorIndex !== -1) {
+    for (let dist = 1; dist < chronological.length && !target; dist++) {
+      const after = chronological[anchorIndex + dist];
+      const before = chronological[anchorIndex - dist];
+      if (after) target = findItem(showKey(after));
+      if (!target && before) target = findItem(showKey(before));
+    }
+  }
+  if (target) {
+    const newListRect = list.getBoundingClientRect();
+    const newR = target.getBoundingClientRect();
+    list.scrollTop += (newR.top - newListRect.top) - anchorOffset;
+    return;
+  }
+  list.scrollTop = 0;
 }
 
 function resetAuftritteToDefault() {
