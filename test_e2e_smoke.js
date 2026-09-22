@@ -107,8 +107,9 @@ const { loadApp, createChecker } = require('./test-helpers');
     w.switchTab('auswertung');
   });
 
-  step('Auswertung: Sortierung auf Dauer und zurück auf Häufigkeit umschalten', () => {
+  step('Auswertung: alle drei Sortierungen (inkl. Bewertung) durchschalten', () => {
     w.setAuswertungSort('duration');
+    w.setAuswertungSort('rating');
     w.setAuswertungSort('count');
   });
 

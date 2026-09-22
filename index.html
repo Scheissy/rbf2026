@@ -254,9 +254,15 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .ausw-loc-main { color: var(--accent); font-weight: 700; margin-left: 6px; }
 .ausw-sort { padding: 0 14px 4px; }
 .ausw-sort-label { display: block; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-.ausw-sort-btns { display: flex; gap: 6px; }
+.ausw-sort-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .ausw-sort-btn { flex: 1; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; }
 .ausw-sort-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+.ausw-sort-btn { min-width: 90px; }
+.ausw-dist-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ausw-dist-row { display: flex; align-items: center; gap: 10px; }
+.ausw-dist-star { font-size: 12px; color: var(--text2); width: 30px; flex-shrink: 0; }
+.ausw-dist-bar-wrap { flex: 1; }
+.ausw-dist-count { font-size: 12px; color: var(--text2); width: 22px; text-align: right; flex-shrink: 0; }
 .ausw-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-top: 3px; }
 .ausw-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
 .ausw-empty { padding: 4px 14px 14px; font-size: 13px; color: var(--text2); }
@@ -1013,29 +1019,44 @@ function auswertungEntries() {
 // Sortierung des Location-Rankings: Hauptkriterium + Tie-Breaker.
 //   'count':    Häufigkeit, bei Gleichstand Gesamtdauer, danach Name
 //   'duration': Gesamtdauer, bei Gleichstand Häufigkeit, danach Name
-function auswertungSortMode() { return appSettings.auswertungSort === 'duration' ? 'duration' : 'count'; }
+function auswertungSortMode() {
+  const m = appSettings.auswertungSort;
+  return (m === 'duration' || m === 'rating') ? m : 'count';
+}
+// Locations ohne Bewertung (avgRating === null) landen im Bewertungs-Modus
+// immer am Ende - unabhängig vom Vorzeichen der Bewertungsskala.
 function compareLocations(mode) {
-  return (x, y) => (mode === 'duration'
-    ? (y.minutes - x.minutes) || (y.count - x.count)
-    : (y.count - x.count) || (y.minutes - x.minutes))
-    || x.location.localeCompare(y.location, 'de');
+  return (x, y) => {
+    if (mode === 'duration') return (y.minutes - x.minutes) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
+    if (mode === 'rating') {
+      const xr = x.avgRating === null ? -1 : x.avgRating, yr = y.avgRating === null ? -1 : y.avgRating;
+      return (yr - xr) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
+    }
+    return (y.count - x.count) || (y.minutes - x.minutes) || x.location.localeCompare(y.location, 'de');
+  };
 }
 function auswertungStats(entries, sortMode) {
   const visited = entries.filter(isShowVisited);
   let totalMinutes = 0, ratingSum = 0, ratingCount = 0;
+  const ratingDist = [0, 0, 0, 0, 0]; // Index 0 = 1 Stern ... Index 4 = 5 Sterne
   const byLoc = {};
   visited.forEach(a => {
     const k = showKey(a);
     const dur = showDurations[k] || 0, r = showRatings[k] || 0;
     totalMinutes += dur;
-    if (r > 0) { ratingSum += r; ratingCount++; }
     const loc = (a.location || '').trim() || 'Ohne Location';
-    const e = byLoc[loc] || (byLoc[loc] = { location: loc, count: 0, minutes: 0 });
+    const e = byLoc[loc] || (byLoc[loc] = { location: loc, count: 0, minutes: 0, ratingSum: 0, ratingCount: 0 });
     e.count++;
     e.minutes += dur;
+    if (r > 0) {
+      ratingSum += r; ratingCount++;
+      ratingDist[Math.min(Math.max(Math.round(r), 1), 5) - 1]++;
+      e.ratingSum += r; e.ratingCount++;
+    }
   });
-  const locations = Object.values(byLoc).sort(compareLocations(sortMode || auswertungSortMode()));
-  return { visitedCount: visited.length, totalMinutes, avgRating: ratingCount ? ratingSum / ratingCount : null, locations };
+  const locations = Object.values(byLoc).map(e => ({ ...e, avgRating: e.ratingCount ? e.ratingSum / e.ratingCount : null }))
+    .sort(compareLocations(sortMode || auswertungSortMode()));
+  return { visitedCount: visited.length, totalMinutes, avgRating: ratingCount ? ratingSum / ratingCount : null, ratingCount, ratingDist, locations };
 }
 // ── WEGSTRECKE ───────────────────────────────────────────────────────────────
 // Strecke = Weg zwischen aufeinanderfolgenden BESUCHTEN Auftritten eines Tages
@@ -1118,9 +1139,14 @@ function auswertungBlockHTML(title, id, entries) {
     body = '<div class="ausw-empty">Noch keine besuchten Auftritte.</div>';
   } else {
     const mode = auswertungSortMode();
-    // Balken bezogen auf das Sortierkriterium (Erster = Maximum, da danach sortiert).
+    // Balken bezogen auf das Sortierkriterium (Erster = Maximum, da danach sortiert) -
+    // AUSSER bei "Bewertung": dort ist die Skala fix (1-5 Sterne), der Balken zeigt
+    // daher die absolute Position auf dieser Skala statt eine Relation zum Erstplatzierten.
     const barMax = mode === 'duration' ? s.locations[0].minutes : s.locations[0].count;
-    const barPct = l => barMax > 0 ? Math.round((mode === 'duration' ? l.minutes : l.count) / barMax * 100) : 0;
+    const barPct = l => {
+      if (mode === 'rating') return l.avgRating === null ? 0 : Math.round(l.avgRating / 5 * 100);
+      return barMax > 0 ? Math.round((mode === 'duration' ? l.minutes : l.count) / barMax * 100) : 0;
+    };
     const kpi = (val, label, attrs = '') => `<div class="ausw-kpi"${attrs}><div class="ausw-kpi-val">${val}</div><div class="ausw-kpi-label">${label}</div></div>`;
     const walk = walkStats(entries);
     const walkLabel = { none: 'Strecke', walk: 'Fußweg', air: 'Luftlinie', mixed: 'Weg (teils Luftlinie)' }[walk.kind];
@@ -1134,9 +1160,21 @@ function auswertungBlockHTML(title, id, entries) {
         ${kpi(walk.legs > 0 ? formatMeters(walk.meters) : '–', walkLabel, ` data-walk-kind="${walk.kind}"`)}
       </div>
       ${walkNote}
+      <div class="ausw-sub">⭐ Bewertungsverteilung</div>
+      ${s.ratingCount === 0
+        ? '<div class="ausw-empty">Noch keine Bewertungen abgegeben.</div>'
+        : `<div class="ausw-dist-list">${[5, 4, 3, 2, 1].map(n => {
+            const c = s.ratingDist[n - 1];
+            const distMax = Math.max(...s.ratingDist);
+            return `<div class="ausw-dist-row" data-stars="${n}" data-count="${c}">
+              <span class="ausw-dist-star">${n} ★</span>
+              <div class="ausw-dist-bar-wrap"><div class="ausw-bar"><div class="ausw-bar-fill" style="width:${distMax > 0 ? Math.round(c / distMax * 100) : 0}%"></div></div></div>
+              <span class="ausw-dist-count">${c}</span>
+            </div>`;
+          }).join('')}</div>`}
       <div class="ausw-sub">📍 Locations</div>
-      <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}">
-        <div class="ausw-loc-head"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${mode === 'duration' ? `${l.count}×` : (l.minutes > 0 ? formatDuration(l.minutes) : '')}</span><span class="ausw-loc-main">${mode === 'duration' ? (l.minutes > 0 ? formatDuration(l.minutes) : '–') : `${l.count}×`}</span></span></div>
+      <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}" data-avg-rating="${l.avgRating === null ? '' : l.avgRating}">
+        <div class="ausw-loc-head"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${mode === 'rating' ? (l.ratingCount > 0 ? `${l.ratingCount}×` : '') : mode === 'duration' ? `${l.count}×` : (l.minutes > 0 ? formatDuration(l.minutes) : '')}</span><span class="ausw-loc-main">${mode === 'rating' ? (l.avgRating === null ? '–' : l.avgRating.toFixed(1)) : mode === 'duration' ? (l.minutes > 0 ? formatDuration(l.minutes) : '–') : `${l.count}×`}</span></span></div>
         <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(l)}%"></div></div>
       </div>`).join('')}</div>`;
   }
@@ -1146,12 +1184,13 @@ function renderAuswertung() {
   const el = document.getElementById('auswertungContent');
   if (!el) return;
   const entries = auswertungEntries();
-  let html = `<div class="info-box"><b>📊 Wann zählt ein Auftritt als besucht?</b><br>Sobald eine <b>Dauer</b> eingetragen <i>oder</i> der Auftritt <b>bewertet</b> wurde – eines von beiden genügt.<br><br><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages – ohne Wege zu Hotel, Essen usw., also eine Untergrenze. ${walkDataAvailable() ? 'Fußwege sind vorberechnet (© OpenStreetMap-Mitwirkende, Routing: OSRM).' : 'Ohne hinterlegte Fußweg-Daten wird die Luftlinie verwendet und als „Luftlinie“ gekennzeichnet.'}</div>`;
+  let html = `<div class="info-box"><b>📊 Wann zählt ein Auftritt als besucht?</b><br>Sobald eine <b>Dauer</b> eingetragen <i>oder</i> der Auftritt <b>bewertet</b> wurde – eines von beiden genügt.<br><br><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages – ohne Wege zu Hotel, Essen usw., also eine Untergrenze. ${walkDataAvailable() ? 'Fußwege sind vorberechnet (© OpenStreetMap-Mitwirkende, Routing: OSRM).' : 'Ohne hinterlegte Fußweg-Daten wird die Luftlinie verwendet und als „Luftlinie“ gekennzeichnet.'}<br><br><b>⭐ Bewertungen</b><br>Verteilung und Location-Sortierung nutzen ausschließlich die <b>Auftritts-Bewertung</b>, nicht die künstlerbezogene Promo-/Listening-Bewertung.</div>`;
   const mode = auswertungSortMode();
   html += `<div class="ausw-sort"><span class="ausw-sort-label">📍 Locations sortieren nach</span>
       <div class="ausw-sort-btns">
         <button class="ausw-sort-btn${mode === 'count' ? ' active' : ''}" data-sort="count" onclick="setAuswertungSort('count')">Häufigkeit</button>
         <button class="ausw-sort-btn${mode === 'duration' ? ' active' : ''}" data-sort="duration" onclick="setAuswertungSort('duration')">Dauer</button>
+        <button class="ausw-sort-btn${mode === 'rating' ? ' active' : ''}" data-sort="rating" onclick="setAuswertungSort('rating')">Bewertung</button>
       </div></div>
     <div class="ausw-note">Bei Gleichstand zählt die jeweils andere Größe, danach der Name.</div>`;
   html += auswertungBlockHTML('Gesamt', 'gesamt', entries);
@@ -1166,7 +1205,7 @@ function renderAuswertung() {
 // Dauerhafte Ansichts-Einstellung (kein Filter): überlebt Reload und wird von
 // "Filter zurücksetzen"/"Jetzt" nicht berührt.
 function setAuswertungSort(mode) {
-  appSettings.auswertungSort = mode === 'duration' ? 'duration' : 'count';
+  appSettings.auswertungSort = (mode === 'duration' || mode === 'rating') ? mode : 'count';
   saveToStorage();
   renderAuswertung();
 }

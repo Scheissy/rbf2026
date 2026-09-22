@@ -31,6 +31,7 @@ mit der Zeit ihren Nutzen.
 | `test_country_abbreviation.js` | `shortenHerkunft()`: Länder-Abkürzungen (inkl. zusammengesetzter Länder mit "/"), nur in der Künstler-, nicht in der Programm-Übersicht. Nutzt eine EIGENE, kleine Testdatendatei (volle Ländernamen) statt `rbf-data.test.js`. |
 | `test_gender_abbreviation.js` | `shortenGeschlecht()`: Kollisionsfreie Kurzformen (w/m/d/mix), nur in der Künstler-Übersicht. |
 | `test_auswertung.js` | Auswertung-Tab (4. Bottom-Nav-Tab): Gesamt + Tages-Blöcke, Definition "besucht" (Dauer ODER Auftritts-Bewertung; Ziel-Flag/Künstler-"gesehen" zählen nicht), Location-Ranking + Balken, Kennzahlen (Anzahl/Zeit/Ø), Events (inkl. globalem Schalter), Unabhängigkeit von Filtern/Ausblenden, Live-Update, Persistenz. |
+| `test_auswertung_rating.js` | Bewertungsverteilung (5→1 Sterne, Gesamt + je Tag, nur Auftritts- nicht Künstler-Bewertung) und 3. Sortier-Option "Bewertung" im Location-Ranking (Ø je Location, absolute 1-5-Balkenskala statt relativ, unbewertete Locations ans Ende), Persistenz. |
 | `test_auswertung_sort.js` | Sortier-Option im Location-Ranking (Häufigkeit/Dauer): Tie-Breaker (Häufigkeit -> Dauer -> Name bzw. Dauer -> Häufigkeit -> Name), Balken/Werte je Modus, Tages-Blöcke, Locations ohne Dauer, Scroll-Erhalt, Persistenz über Neustart, Unabhängigkeit von Reset/"Jetzt", ungültige Werte. |
 | `test_preview_build.js` | Preview-Build (`build-preview.py`): `preview.html` entsteht aus `index.html` + Testdaten, läuft fehlerfrei, nutzt `__previewStorage` statt `localStorage` und enthält dieselben Features (4 Tabs) wie die App. |
 | `test_walk_distance.js` | Wegstrecke im Auswertung-Tab: Kette der besuchten Auftritte je Tag (Zeiten nach Mitternacht korrekt sortiert, Wege nie über Tagesgrenzen), Haversine gegen unabhängige Referenz, Fußweg-Matrix vs. Luftlinie-Fallback vs. gemischt (Kennzeichnung), Alias-Locations, Auftritte ohne Koordinaten/Uhrzeit (Hinweis), Quellenangabe. Nutzt eigene Testdaten + `walkScript`. |
@@ -40,7 +41,7 @@ mit der Zeit ihren Nutzen.
 ## Hilfsdateien
 
 - `test-helpers.js` - gemeinsame Helfer (`loadApp()` inkl. Option `walkScript`, `reloadWithState()`,
-  `createChecker()`). Alle 26 Testdateien oben nutzen diese Helfer bereits
+  `createChecker()`). Alle 27 Testdateien oben nutzen diese Helfer bereits
   (Migration in 8 Runden abgeschlossen) - Boilerplate wurde dabei um
   durchschnittlich ca. 43 % pro Datei reduziert, die eigentliche Prüf-Logik
   blieb inhaltlich unverändert.
