@@ -34,6 +34,13 @@ const btn = (d, mode) => d.querySelector(`.ausw-sort-btn[data-sort="${mode}"]`);
   w.setShowRating('x', 'nid:11', 2);
   w.switchTab('auswertung');
 
+  // ── 0) Reihenfolge im Block: Locations VOR der Bewertungsverteilung ────
+  {
+    const html = block(d, 'gesamt').innerHTML;
+    t.check('Die Bewertungsverteilung steht unterhalb des Locations-Abschnitts (nicht darüber).',
+      html.indexOf('📍 Locations') !== -1 && html.indexOf('📍 Locations') < html.indexOf('⭐ Bewertungsverteilung'));
+  }
+
   // ── 1) Bewertungsverteilung: Gesamt ─────────────────────────────────────
   t.check('Verteilung zeigt immer alle 5 Stufen (5→1), auch wenn eine Stufe 0x vorkommt.',
     distRows(d, 'gesamt').map(r => r.stars).join(',') === '5,4,3,2,1');

@@ -1160,6 +1160,11 @@ function auswertungBlockHTML(title, id, entries) {
         ${kpi(walk.legs > 0 ? formatMeters(walk.meters) : '–', walkLabel, ` data-walk-kind="${walk.kind}"`)}
       </div>
       ${walkNote}
+      <div class="ausw-sub">📍 Locations</div>
+      <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}" data-avg-rating="${l.avgRating === null ? '' : l.avgRating}">
+        <div class="ausw-loc-head"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${mode === 'rating' ? (l.ratingCount > 0 ? `${l.ratingCount}×` : '') : mode === 'duration' ? `${l.count}×` : (l.minutes > 0 ? formatDuration(l.minutes) : '')}</span><span class="ausw-loc-main">${mode === 'rating' ? (l.avgRating === null ? '–' : l.avgRating.toFixed(1)) : mode === 'duration' ? (l.minutes > 0 ? formatDuration(l.minutes) : '–') : `${l.count}×`}</span></span></div>
+        <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(l)}%"></div></div>
+      </div>`).join('')}</div>
       <div class="ausw-sub">⭐ Bewertungsverteilung</div>
       ${s.ratingCount === 0
         ? '<div class="ausw-empty">Noch keine Bewertungen abgegeben.</div>'
@@ -1171,12 +1176,7 @@ function auswertungBlockHTML(title, id, entries) {
               <div class="ausw-dist-bar-wrap"><div class="ausw-bar"><div class="ausw-bar-fill" style="width:${distMax > 0 ? Math.round(c / distMax * 100) : 0}%"></div></div></div>
               <span class="ausw-dist-count">${c}</span>
             </div>`;
-          }).join('')}</div>`}
-      <div class="ausw-sub">📍 Locations</div>
-      <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}" data-avg-rating="${l.avgRating === null ? '' : l.avgRating}">
-        <div class="ausw-loc-head"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${mode === 'rating' ? (l.ratingCount > 0 ? `${l.ratingCount}×` : '') : mode === 'duration' ? `${l.count}×` : (l.minutes > 0 ? formatDuration(l.minutes) : '')}</span><span class="ausw-loc-main">${mode === 'rating' ? (l.avgRating === null ? '–' : l.avgRating.toFixed(1)) : mode === 'duration' ? (l.minutes > 0 ? formatDuration(l.minutes) : '–') : `${l.count}×`}</span></span></div>
-        <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(l)}%"></div></div>
-      </div>`).join('')}</div>`;
+          }).join('')}</div>`}`;
   }
   return `<div class="io-section ausw-block" data-ausw="${escapeHtml(id)}"><div class="io-section-title">${escapeHtml(title)}</div>${body}</div>`;
 }
