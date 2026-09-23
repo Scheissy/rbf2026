@@ -32,6 +32,7 @@ mit der Zeit ihren Nutzen.
 | `test_country_abbreviation.js` | `shortenHerkunft()`: Länder-Abkürzungen (inkl. zusammengesetzter Länder mit "/"), nur in der Künstler-, nicht in der Programm-Übersicht. Nutzt eine EIGENE, kleine Testdatendatei (volle Ländernamen) statt `rbf-data.test.js`. |
 | `test_gender_abbreviation.js` | `shortenGeschlecht()`: Kollisionsfreie Kurzformen (w/m/d/mix), nur in der Künstler-Übersicht. |
 | `test_auswertung.js` | Auswertung-Tab (4. Bottom-Nav-Tab): dynamische Tages-Auswahl (Mi/Do/Fr/Sa einzeln an-/abwählbar, EINE Übersicht statt fester Gesamt+Tage-Blöcke, Daten werden über die gewählten Tage hinweg summiert), Default = alle Tage ("Gesamt"), leere Auswahl, Titel je nach Auswahl, Persistenz, Fallback bei Datenupdate (gespeicherte Tage existieren nicht mehr), Definition "besucht" (Dauer ODER Auftritts-Bewertung; Ziel-Flag/Künstler-"gesehen" zählen nicht), Location-Ranking + Balken, Kennzahlen (Anzahl/Zeit/Ø), Events (inkl. globalem Schalter), Unabhängigkeit von Filtern/Ausblenden, Scroll-Erhalt. |
+| `test_auswertung_agg.js` | Summe/Durchschnitt-Umschalter bei "Dauer" und "Bewertung" (bei "Häufigkeit" bewusst kein Umschalter): Standardwerte unverändert (Dauer=Summe, Bewertung=Durchschnitt), unabhängige Merkfähigkeit je Größe, Sortierung + Anzeige + Balkenskalierung je Kombination, Ø nur über Einträge MIT Wert, Persistenz. |
 | `test_auswertung_expand.js` | Aufklappbare Detail-Listen in der Auswertung: Location-Zeilen und Bewertungsverteilungs-Zeilen zeigen beim Aufklappen die zugrunde liegenden Auftritte (chronologisch, mit Dauer/Bewertung falls vorhanden), Pfeil-Umschaltung, Zeilen unabhängig voneinander, leere Bewertungsstufen ohne Pfeil/Detail, rein clientseitiger (nicht persistenter) Zustand. |
 | `test_auswertung_info_modal.js` | Auswertung-Tab: kompakter Header (Titel + ⓘ-Icon) statt der früheren, dauerhaft sichtbaren Info-Box; Modal-Inhalt, Öffnen/Schließen (Icon-Klick, Backdrop, Karte selbst), dynamischer Fußweg-Hinweis, bleibt nach Neu-Rendern funktionsfähig. |
 | `test_auswertung_rating.js` | Bewertungsverteilung (5→1 Sterne, über die gewählten Tage summiert, nur Auftritts- nicht Künstler-Bewertung) und 3. Sortier-Option "Bewertung" im Location-Ranking (Ø je Location, absolute 1-5-Balkenskala statt relativ, unbewertete Locations ans Ende), Reihenfolge (Locations vor Verteilung), Persistenz. |
@@ -44,7 +45,7 @@ mit der Zeit ihren Nutzen.
 ## Hilfsdateien
 
 - `test-helpers.js` - gemeinsame Helfer (`loadApp()` inkl. Option `walkScript`, `reloadWithState()`,
-  `createChecker()`). Alle 30 Testdateien oben nutzen diese Helfer bereits
+  `createChecker()`). Alle 31 Testdateien oben nutzen diese Helfer bereits
   (Migration in 8 Runden abgeschlossen) - Boilerplate wurde dabei um
   durchschnittlich ca. 43 % pro Datei reduziert, die eigentliche Prüf-Logik
   blieb inhaltlich unverändert.

@@ -120,7 +120,9 @@ const { loadApp, createChecker } = require('./test-helpers');
 
   step('Auswertung: alle drei Sortierungen (inkl. Bewertung) durchschalten', () => {
     w.setAuswertungSort('duration');
+    w.setAuswertungAgg('avg');
     w.setAuswertungSort('rating');
+    w.setAuswertungAgg('sum');
     w.setAuswertungSort('count');
   });
 

@@ -1076,14 +1076,42 @@ function auswertungSortMode() {
   const m = appSettings.auswertungSort;
   return (m === 'duration' || m === 'rating') ? m : 'count';
 }
-// Locations ohne Bewertung (avgRating === null) landen im Bewertungs-Modus
-// immer am Ende - unabhängig vom Vorzeichen der Bewertungsskala.
+// Zweite Achse NUR für "Dauer" und "Bewertung" relevant: Summe vs. Durchschnitt
+// pro Location. Bei "Häufigkeit" ergibt das keinen Sinn (eine Anzahl hat keinen
+// sinnvollen "Durchschnitt"). Jede der beiden Größen merkt sich ihre eigene
+// Wahl separat (appSettings.auswertungDurationAgg/auswertungRatingAgg), damit
+// ein Wechsel zwischen den Sortier-Buttons die jeweils andere Einstellung
+// nicht verwirft. Die Vorgabewerte entsprechen dem bisherigen Verhalten:
+// Dauer war schon immer die Summe, Bewertung schon immer der Durchschnitt.
+function auswertungAggMode(mode) {
+  if (mode === 'duration') return appSettings.auswertungDurationAgg === 'avg' ? 'avg' : 'sum';
+  if (mode === 'rating') return appSettings.auswertungRatingAgg === 'sum' ? 'sum' : 'avg';
+  return null;
+}
+function setAuswertungAgg(agg) {
+  const mode = auswertungSortMode();
+  if (mode === 'duration') appSettings.auswertungDurationAgg = agg === 'avg' ? 'avg' : 'sum';
+  else if (mode === 'rating') appSettings.auswertungRatingAgg = agg === 'sum' ? 'sum' : 'avg';
+  else return;
+  saveToStorage();
+  renderAuswertung();
+}
+// Locations ohne Bewertung/Dauer (Sentinel -1) landen im jeweiligen Modus
+// immer am Ende - unabhängig vom Vorzeichen der Skala. Bei "Summe" ist 0 ein
+// gültiger, natürlich niedrigster Wert (keine Sonderbehandlung nötig); bei
+// "Durchschnitt" dagegen ist "kein Wert vorhanden" von "0" zu unterscheiden.
 function compareLocations(mode) {
+  const agg = auswertungAggMode(mode);
   return (x, y) => {
-    if (mode === 'duration') return (y.minutes - x.minutes) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
+    if (mode === 'duration') {
+      const xv = agg === 'avg' ? (x.durationCount ? x.minutes / x.durationCount : -1) : x.minutes;
+      const yv = agg === 'avg' ? (y.durationCount ? y.minutes / y.durationCount : -1) : y.minutes;
+      return (yv - xv) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
+    }
     if (mode === 'rating') {
-      const xr = x.avgRating === null ? -1 : x.avgRating, yr = y.avgRating === null ? -1 : y.avgRating;
-      return (yr - xr) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
+      const xv = agg === 'sum' ? x.ratingSum : (x.avgRating === null ? -1 : x.avgRating);
+      const yv = agg === 'sum' ? y.ratingSum : (y.avgRating === null ? -1 : y.avgRating);
+      return (yv - xv) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
     }
     return (y.count - x.count) || (y.minutes - x.minutes) || x.location.localeCompare(y.location, 'de');
   };
@@ -1100,9 +1128,10 @@ function auswertungStats(entries, sortMode) {
     const dur = showDurations[k] || 0, r = showRatings[k] || 0;
     totalMinutes += dur;
     const loc = (a.location || '').trim() || 'Ohne Location';
-    const e = byLoc[loc] || (byLoc[loc] = { location: loc, count: 0, minutes: 0, ratingSum: 0, ratingCount: 0, entries: [] });
+    const e = byLoc[loc] || (byLoc[loc] = { location: loc, count: 0, minutes: 0, durationCount: 0, ratingSum: 0, ratingCount: 0, entries: [] });
     e.count++;
     e.minutes += dur;
+    if (dur > 0) e.durationCount++;
     e.entries.push(a);
     if (r > 0) {
       ratingSum += r; ratingCount++;
@@ -1224,13 +1253,23 @@ function auswertungBlockHTML(title, id, entries) {
     body = '<div class="ausw-empty">Noch keine besuchten Auftritte.</div>';
   } else {
     const mode = auswertungSortMode();
-    // Balken bezogen auf das Sortierkriterium (Erster = Maximum, da danach sortiert) -
-    // AUSSER bei "Bewertung": dort ist die Skala fix (1-5 Sterne), der Balken zeigt
-    // daher die absolute Position auf dieser Skala statt eine Relation zum Erstplatzierten.
-    const barMax = mode === 'duration' ? s.locations[0].minutes : s.locations[0].count;
+    const agg = auswertungAggMode(mode); // null bei 'count'
+    // Metrik je Modus+Aggregation, für Balken UND Anzeige einheitlich verwendet.
+    const metricOf = l => {
+      if (mode === 'duration') return agg === 'avg' ? (l.durationCount ? l.minutes / l.durationCount : null) : l.minutes;
+      if (mode === 'rating') return agg === 'sum' ? l.ratingSum : l.avgRating;
+      return l.count;
+    };
+    // Balken: bei "Durchschnitt der Bewertung" ist die Skala fix (1-5 Sterne) ->
+    // absolute Position auf dieser Skala. In allen anderen Fällen (Häufigkeit,
+    // Dauer in beiden Varianten, Bewertungs-SUMME) gibt es keine feste Obergrenze,
+    // der Balken ist daher relativ zum Erstplatzierten (Sortierkriterium).
+    const isAbsoluteRatingBar = mode === 'rating' && agg !== 'sum';
+    const barMax = isAbsoluteRatingBar ? null : (metricOf(s.locations[0]) || 0);
     const barPct = l => {
-      if (mode === 'rating') return l.avgRating === null ? 0 : Math.round(l.avgRating / 5 * 100);
-      return barMax > 0 ? Math.round((mode === 'duration' ? l.minutes : l.count) / barMax * 100) : 0;
+      if (isAbsoluteRatingBar) return l.avgRating === null ? 0 : Math.round(l.avgRating / 5 * 100);
+      const v = metricOf(l);
+      return (barMax > 0 && v) ? Math.round(v / barMax * 100) : 0;
     };
     const kpi = (val, label, attrs = '') => `<div class="ausw-kpi"${attrs}><div class="ausw-kpi-val">${val}</div><div class="ausw-kpi-label">${label}</div></div>`;
     const walk = walkStats(entries);
@@ -1246,11 +1285,26 @@ function auswertungBlockHTML(title, id, entries) {
       </div>
       ${walkNote}
       <div class="ausw-sub">📍 Locations</div>
-      <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}" data-avg-rating="${l.avgRating === null ? '' : l.avgRating}">
-        <div class="ausw-loc-head" onclick="toggleAuswDetail(this)"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${mode === 'rating' ? (l.ratingCount > 0 ? `${l.ratingCount}×` : '') : mode === 'duration' ? `${l.count}×` : (l.minutes > 0 ? formatDuration(l.minutes) : '')}</span><span class="ausw-loc-main">${mode === 'rating' ? (l.avgRating === null ? '–' : l.avgRating.toFixed(1)) : mode === 'duration' ? (l.minutes > 0 ? formatDuration(l.minutes) : '–') : `${l.count}×`}</span><span class="ausw-expand-arrow">▸</span></span></div>
+      <div class="ausw-loc-list">${s.locations.map(l => {
+        // Nebenwert (Kontext, klein): bei Durchschnitts-Werten die Anzahl der
+        // EINGEFLOSSENEN Angaben (nicht aller Besuche), bei Summen/Häufigkeit
+        // wie gehabt Anzahl bzw. Dauer.
+        const meta = mode === 'rating'
+          ? (l.ratingCount > 0 ? `${l.ratingCount}×` : '')
+          : mode === 'duration'
+            ? (agg === 'avg' ? (l.durationCount > 0 ? `${l.durationCount}×` : '') : `${l.count}×`)
+            : (l.minutes > 0 ? formatDuration(l.minutes) : '');
+        const main = mode === 'rating'
+          ? (agg === 'sum' ? (l.ratingCount > 0 ? String(l.ratingSum) : '–') : (l.avgRating === null ? '–' : l.avgRating.toFixed(1)))
+          : mode === 'duration'
+            ? (agg === 'avg' ? (l.durationCount > 0 ? formatDuration(Math.round(l.minutes / l.durationCount)) : '–') : (l.minutes > 0 ? formatDuration(l.minutes) : '–'))
+            : `${l.count}×`;
+        return `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}" data-avg-rating="${l.avgRating === null ? '' : l.avgRating}">
+        <div class="ausw-loc-head" onclick="toggleAuswDetail(this)"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${meta}</span><span class="ausw-loc-main">${main}</span><span class="ausw-expand-arrow">▸</span></span></div>
         <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(l)}%"></div></div>
         <div class="ausw-expand-detail collapsed">${l.entries.map(auswEntryLineHTML).join('')}</div>
-      </div>`).join('')}</div>
+      </div>`;
+      }).join('')}</div>
       <div class="ausw-sub">⭐ Bewertungsverteilung</div>
       ${s.ratingCount === 0
         ? '<div class="ausw-empty">Noch keine Bewertungen abgegeben.</div>'
@@ -1288,13 +1342,19 @@ function renderAuswertung() {
     html += `<div class="ausw-empty">Kein Tag ausgewählt - bitte mindestens einen Tag antippen.</div>`;
   } else {
     const mode = auswertungSortMode();
+    const agg = auswertungAggMode(mode);
     html += `<div class="ausw-sort"><span class="ausw-sort-label">📍 Locations sortieren nach</span>
         <div class="ausw-sort-btns">
           <button class="ausw-sort-btn${mode === 'count' ? ' active' : ''}" data-sort="count" onclick="setAuswertungSort('count')">Häufigkeit</button>
           <button class="ausw-sort-btn${mode === 'duration' ? ' active' : ''}" data-sort="duration" onclick="setAuswertungSort('duration')">Dauer</button>
           <button class="ausw-sort-btn${mode === 'rating' ? ' active' : ''}" data-sort="rating" onclick="setAuswertungSort('rating')">Bewertung</button>
         </div></div>
-      <div class="ausw-note">Bei Gleichstand zählt die jeweils andere Größe, danach der Name.</div>`;
+      <div class="ausw-note">Bei Gleichstand zählt die jeweils andere Größe, danach der Name.</div>
+      ${agg !== null ? `<div class="ausw-sort"><span class="ausw-sort-label">Anzeigen als</span>
+        <div class="ausw-sort-btns">
+          <button class="ausw-sort-btn${agg === 'sum' ? ' active' : ''}" data-agg="sum" onclick="setAuswertungAgg('sum')">Summe</button>
+          <button class="ausw-sort-btn${agg === 'avg' ? ' active' : ''}" data-agg="avg" onclick="setAuswertungAgg('avg')">Durchschnitt</button>
+        </div></div>` : ''}`;
     html += auswertungBlockHTML(auswertungSelectionTitle(selectedDays), 'auswahl', entries);
   }
   // Scroll-Position erhalten (Pixel-Offset): der Inhalt wird bei jeder Interaktion
