@@ -130,6 +130,11 @@ const { loadApp, createChecker } = require('./test-helpers');
     dayBtn.click();
   });
 
+  step('Auswertung: eine Location-Zeile auf- und wieder zuklappen', () => {
+    const head = d.querySelector('.ausw-loc-head');
+    if (head) { head.click(); head.click(); }
+  });
+
   step('In den Settings-Tab (io) wechseln', () => {
     w.switchTab('io');
   });

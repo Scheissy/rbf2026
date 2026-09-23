@@ -270,6 +270,17 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .ausw-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-top: 3px; }
 .ausw-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
 .ausw-empty { padding: 4px 14px 14px; font-size: 13px; color: var(--text2); }
+.ausw-loc-head { cursor: pointer; }
+.ausw-dist-row[onclick] { cursor: pointer; }
+.ausw-expand-arrow { color: var(--text2); font-size: 11px; width: 12px; text-align: center; flex-shrink: 0; }
+.ausw-expand-arrow-spacer { width: 12px; flex-shrink: 0; display: inline-block; }
+.ausw-expand-detail.collapsed { display: none; }
+.ausw-expand-detail { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 6px; }
+.ausw-expand-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 12px; color: var(--text2); }
+.ausw-expand-time { color: var(--text2); flex-shrink: 0; }
+.ausw-expand-name { color: var(--text); font-weight: 600; }
+.ausw-expand-meta { color: var(--text2); margin-left: auto; white-space: nowrap; }
+.ausw-expand-stars { display: inline-flex; }
 .ausw-note { padding: 0 14px 12px; font-size: 11px; color: var(--text2); line-height: 1.5; }
 input[type=file] { display: none; }
 
@@ -1081,25 +1092,57 @@ function auswertungStats(entries, sortMode) {
   const visited = entries.filter(isShowVisited);
   let totalMinutes = 0, ratingSum = 0, ratingCount = 0;
   const ratingDist = [0, 0, 0, 0, 0]; // Index 0 = 1 Stern ... Index 4 = 5 Sterne
+  const ratingEntries = [[], [], [], [], []]; // dieselbe Indizierung: welche Auftritte stecken dahinter
   const byLoc = {};
+  const chronoCompare = (x, y) => dayIndex(x.day) - dayIndex(y.day) || timeSortValue(x.time) - timeSortValue(y.time) || x.name.localeCompare(y.name, 'de');
   visited.forEach(a => {
     const k = showKey(a);
     const dur = showDurations[k] || 0, r = showRatings[k] || 0;
     totalMinutes += dur;
     const loc = (a.location || '').trim() || 'Ohne Location';
-    const e = byLoc[loc] || (byLoc[loc] = { location: loc, count: 0, minutes: 0, ratingSum: 0, ratingCount: 0 });
+    const e = byLoc[loc] || (byLoc[loc] = { location: loc, count: 0, minutes: 0, ratingSum: 0, ratingCount: 0, entries: [] });
     e.count++;
     e.minutes += dur;
+    e.entries.push(a);
     if (r > 0) {
       ratingSum += r; ratingCount++;
-      ratingDist[Math.min(Math.max(Math.round(r), 1), 5) - 1]++;
+      const bucket = Math.min(Math.max(Math.round(r), 1), 5) - 1;
+      ratingDist[bucket]++;
+      ratingEntries[bucket].push(a);
       e.ratingSum += r; e.ratingCount++;
     }
   });
-  const locations = Object.values(byLoc).map(e => ({ ...e, avgRating: e.ratingCount ? e.ratingSum / e.ratingCount : null }))
+  const locations = Object.values(byLoc).map(e => ({ ...e, avgRating: e.ratingCount ? e.ratingSum / e.ratingCount : null, entries: e.entries.slice().sort(chronoCompare) }))
     .sort(compareLocations(sortMode || auswertungSortMode()));
-  return { visitedCount: visited.length, totalMinutes, avgRating: ratingCount ? ratingSum / ratingCount : null, ratingCount, ratingDist, locations };
+  return { visitedCount: visited.length, totalMinutes, avgRating: ratingCount ? ratingSum / ratingCount : null, ratingCount, ratingDist, ratingEntries: ratingEntries.map(list => list.slice().sort(chronoCompare)), locations };
 }
+// Eine Zeile in einer aufgeklappten Detail-Liste (welche Auftritte hinter
+// einer Zahl in der Auswertung stecken) - zeigt Tag/Zeit, Name und, falls
+// vorhanden, Dauer und Auftritts-Bewertung. Rein informativ, keine Aktionen.
+function auswEntryLineHTML(a) {
+  const k = showKey(a);
+  const dur = showDurations[k], r = showRatings[k] || 0;
+  const metaParts = [];
+  if (dur) metaParts.push(`⏱ ${formatDuration(dur)}`);
+  if (r > 0) metaParts.push(`<span class="ausw-expand-stars">${miniStarsShow(r)}</span>`);
+  return `<div class="ausw-expand-item">
+    <span class="ausw-expand-time">${escapeHtml(a.day)} · ${a.time ? escapeHtml(a.time) : 'TBA'}</span>
+    <span class="ausw-expand-name">${a.isEvent ? (a.kategorie === 'Musik' ? '🎵 ' : '🎪 ') : ''}${escapeHtml(a.name)}</span>
+    ${metaParts.length ? `<span class="ausw-expand-meta">${metaParts.join(' ')}</span>` : ''}
+  </div>`;
+}
+// Klappt die Detail-Liste einer Auswertungs-Zeile (Location oder Bewertungs-
+// stufe) auf/zu - rein clientseitig, kein Neu-Rendern, kein Speichern, genau
+// wie das Auf-/Zuklappen einzelner Programm-Einträge. headEl ist die anklick-
+// bare Kopfzeile, deren Elternelement genau EINE .ausw-expand-detail enthält.
+function toggleAuswDetail(headEl) {
+  const detail = headEl.parentElement.querySelector('.ausw-expand-detail');
+  if (!detail) return;
+  const collapsed = detail.classList.toggle('collapsed');
+  const arrow = headEl.querySelector('.ausw-expand-arrow');
+  if (arrow) arrow.textContent = collapsed ? '▸' : '▾';
+}
+
 // ── WEGSTRECKE ───────────────────────────────────────────────────────────────
 // Strecke = Weg zwischen aufeinanderfolgenden BESUCHTEN Auftritten eines Tages
 // (chronologisch, Zeiten nach Mitternacht korrekt einsortiert). Wege zu Hotel,
@@ -1204,8 +1247,9 @@ function auswertungBlockHTML(title, id, entries) {
       ${walkNote}
       <div class="ausw-sub">📍 Locations</div>
       <div class="ausw-loc-list">${s.locations.map(l => `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}" data-avg-rating="${l.avgRating === null ? '' : l.avgRating}">
-        <div class="ausw-loc-head"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${mode === 'rating' ? (l.ratingCount > 0 ? `${l.ratingCount}×` : '') : mode === 'duration' ? `${l.count}×` : (l.minutes > 0 ? formatDuration(l.minutes) : '')}</span><span class="ausw-loc-main">${mode === 'rating' ? (l.avgRating === null ? '–' : l.avgRating.toFixed(1)) : mode === 'duration' ? (l.minutes > 0 ? formatDuration(l.minutes) : '–') : `${l.count}×`}</span></span></div>
+        <div class="ausw-loc-head" onclick="toggleAuswDetail(this)"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${mode === 'rating' ? (l.ratingCount > 0 ? `${l.ratingCount}×` : '') : mode === 'duration' ? `${l.count}×` : (l.minutes > 0 ? formatDuration(l.minutes) : '')}</span><span class="ausw-loc-main">${mode === 'rating' ? (l.avgRating === null ? '–' : l.avgRating.toFixed(1)) : mode === 'duration' ? (l.minutes > 0 ? formatDuration(l.minutes) : '–') : `${l.count}×`}</span><span class="ausw-expand-arrow">▸</span></span></div>
         <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(l)}%"></div></div>
+        <div class="ausw-expand-detail collapsed">${l.entries.map(auswEntryLineHTML).join('')}</div>
       </div>`).join('')}</div>
       <div class="ausw-sub">⭐ Bewertungsverteilung</div>
       ${s.ratingCount === 0
@@ -1213,10 +1257,14 @@ function auswertungBlockHTML(title, id, entries) {
         : `<div class="ausw-dist-list">${[5, 4, 3, 2, 1].map(n => {
             const c = s.ratingDist[n - 1];
             const distMax = Math.max(...s.ratingDist);
-            return `<div class="ausw-dist-row" data-stars="${n}" data-count="${c}">
-              <span class="ausw-dist-star">${n} ★</span>
-              <div class="ausw-dist-bar-wrap"><div class="ausw-bar"><div class="ausw-bar-fill" style="width:${distMax > 0 ? Math.round(c / distMax * 100) : 0}%"></div></div></div>
-              <span class="ausw-dist-count">${c}</span>
+            return `<div class="ausw-dist-entry">
+              <div class="ausw-dist-row" data-stars="${n}" data-count="${c}" onclick="${c > 0 ? 'toggleAuswDetail(this)' : ''}">
+                <span class="ausw-dist-star">${n} ★</span>
+                <div class="ausw-dist-bar-wrap"><div class="ausw-bar"><div class="ausw-bar-fill" style="width:${distMax > 0 ? Math.round(c / distMax * 100) : 0}%"></div></div></div>
+                <span class="ausw-dist-count">${c}</span>
+                ${c > 0 ? '<span class="ausw-expand-arrow">▸</span>' : '<span class="ausw-expand-arrow-spacer"></span>'}
+              </div>
+              ${c > 0 ? `<div class="ausw-expand-detail collapsed">${s.ratingEntries[n - 1].map(auswEntryLineHTML).join('')}</div>` : ''}
             </div>`;
           }).join('')}</div>`}`;
   }
