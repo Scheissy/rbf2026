@@ -57,43 +57,32 @@ const names = d => rows(d).map(r => r.name).join(' | ');
   t.check('Balken im Durchschnitt-Modus sind relativ zum höchsten DURCHSCHNITT (100 % / 33 %), nicht zur Summe.',
     avgRows[0].width === '100%' && avgRows[1].width === '33%', avgRows.map(r => r.width));
 
-  // ── 4) Bewertung: Standard ist weiterhin "Durchschnitt" (bestehendes Verhalten) ─
+  // ── 4) Bewertung: bewusst KEIN Summe/Durchschnitt-Umschalter mehr - die
+  // Summe von Sternebewertungen ist keine aussagekräftige Größe (anders als
+  // bei Minuten) und wurde deshalb wieder entfernt. Immer Durchschnitt,
+  // unabhängig von der zuvor bei "Dauer" gewählten Einstellung.
   sortBtn(d, 'rating').click();
-  t.check('Bei "Bewertung" ist der Standard weiterhin "Durchschnitt" (unverändert) - die Dauer-Wahl von eben bleibt unabhängig erhalten.',
-    aggBtn(d, 'avg').classList.contains('active') && !aggBtn(d, 'sum').classList.contains('active'));
+  t.check('Bei "Bewertung" gibt es keinen Summe/Durchschnitt-Umschalter mehr (bewusst entfernt).', aggBtns(d).length === 0);
   // Docks Ø = (3+5)/2 = 4.0; Molotow Ø = 5.0 -> Molotow vorn.
-  t.check('Bewertung/Durchschnitt: Molotow (Ø 5.0) vor Docks (Ø 4.0).', names(d) === 'Molotow | Docks', names(d));
+  t.check('Bewertung zeigt weiterhin (fest) den Durchschnitt: Molotow (Ø 5.0) vor Docks (Ø 4.0).', names(d) === 'Molotow | Docks', names(d));
+  t.check('Balken bei Bewertung bleiben absolut auf der 1-5-Skala (Molotow Ø5.0 = 100 %, Docks Ø4.0 = 80 %).',
+    rows(d)[0].width === '100%' && rows(d)[1].width === '80%', rows(d).map(r => r.width));
 
-  // ── 5) Bewertung: Umschalten auf "Summe" ────────────────────────────────
-  aggBtn(d, 'sum').click();
-  // Docks Summe = 3+5=8; Molotow Summe = 5 -> Docks jetzt vorn (Reihenfolge dreht sich!).
-  t.check('Bewertung/Summe: Docks (Summe 8) vor Molotow (Summe 5) - genau umgekehrte Reihenfolge zum Durchschnitt.',
-    names(d) === 'Docks | Molotow', names(d));
-  const ratSumRows = rows(d);
-  t.check('Bewertung/Summe zeigt die Summe der Sterne groß, die Anzahl der BEWERTUNGEN klein.',
-    ratSumRows[0].main === '8' && ratSumRows[0].meta === '2×', ratSumRows[0]);
-  t.check('Balken im Bewertungs-Summen-Modus sind relativ zur höchsten Summe (nicht absolut auf 1-5).',
-    ratSumRows[0].width === '100%' && ratSumRows[1].width === '63%', ratSumRows.map(r => r.width));
-
-  // ── 6) Zurück auf "Durchschnitt" stellt die ursprüngliche Reihenfolge wieder her ─
-  aggBtn(d, 'avg').click();
-  t.check('Zurückschalten auf "Durchschnitt" stellt Molotow-vor-Docks wieder her (absolute 1-5-Skala wie zuvor).',
-    names(d) === 'Molotow | Docks' && rows(d)[0].width === '100%', names(d));
-
-  // ── 7) Jede Größe merkt sich ihre eigene Wahl unabhängig ────────────────
+  // ── 5) Zurück bei "Dauer": die dort gewählte Einstellung ist unabhängig
+  // von "Bewertung" erhalten geblieben (Bewertung hat ja gar keine eigene
+  // Einstellung mehr, kann also auch nichts überschrieben haben). ──────────
   sortBtn(d, 'duration').click();
-  t.check('Zurück bei "Dauer": die dort zuvor gewählte "Durchschnitt"-Einstellung ist noch aktiv (unabhängig von der Bewertungs-Einstellung).',
+  t.check('Zurück bei "Dauer": die zuvor gewählte "Durchschnitt"-Einstellung ist weiterhin aktiv.',
     aggBtn(d, 'avg').classList.contains('active'));
 
-  // ── 8) Persistenz über einen echten Neustart ────────────────────────────
+  // ── 6) Persistenz über einen echten Neustart (nur für Dauer relevant) ───
   const reloaded = await reloadWithState(w, ['rbf2026_v1']);
   reloaded.window.switchTab('auswertung');
   reloaded.window.setAuswertungSort('duration');
   t.check('Die Wahl "Durchschnitt" bei Dauer übersteht einen Neustart.',
     aggBtn(reloaded.document, 'avg').classList.contains('active'), aggBtns(reloaded.document).map(b => b.className));
   reloaded.window.setAuswertungSort('rating');
-  t.check('Die (unangetastete) Wahl "Durchschnitt" bei Bewertung übersteht ebenfalls einen Neustart.',
-    aggBtn(reloaded.document, 'avg').classList.contains('active'));
+  t.check('Bei Bewertung erscheint auch nach dem Neustart kein Umschalter.', aggBtns(reloaded.document).length === 0);
 
   t.check('Keine JS-Fehler während des gesamten Ablaufs.', errors.length === 0, errors);
   t.finish();

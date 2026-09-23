@@ -1076,30 +1076,25 @@ function auswertungSortMode() {
   const m = appSettings.auswertungSort;
   return (m === 'duration' || m === 'rating') ? m : 'count';
 }
-// Zweite Achse NUR für "Dauer" und "Bewertung" relevant: Summe vs. Durchschnitt
-// pro Location. Bei "Häufigkeit" ergibt das keinen Sinn (eine Anzahl hat keinen
-// sinnvollen "Durchschnitt"). Jede der beiden Größen merkt sich ihre eigene
-// Wahl separat (appSettings.auswertungDurationAgg/auswertungRatingAgg), damit
-// ein Wechsel zwischen den Sortier-Buttons die jeweils andere Einstellung
-// nicht verwirft. Die Vorgabewerte entsprechen dem bisherigen Verhalten:
-// Dauer war schon immer die Summe, Bewertung schon immer der Durchschnitt.
+// Zweite Achse NUR für "Dauer" relevant: Summe vs. Durchschnitt pro Location.
+// Bei "Häufigkeit" ergibt das keinen Sinn (eine Anzahl hat keinen sinnvollen
+// Durchschnitt). Bei "Bewertung" WÜRDE es technisch gehen, ist aber bewusst
+// wieder entfernt: die Summe von Sternebewertungen ist keine aussagekräftige
+// Größe (im Gegensatz zur Summe von Minuten) - Bewertung zeigt daher immer
+// den Durchschnitt, wie schon vor der kurzzeitigen Erweiterung.
 function auswertungAggMode(mode) {
   if (mode === 'duration') return appSettings.auswertungDurationAgg === 'avg' ? 'avg' : 'sum';
-  if (mode === 'rating') return appSettings.auswertungRatingAgg === 'sum' ? 'sum' : 'avg';
   return null;
 }
 function setAuswertungAgg(agg) {
-  const mode = auswertungSortMode();
-  if (mode === 'duration') appSettings.auswertungDurationAgg = agg === 'avg' ? 'avg' : 'sum';
-  else if (mode === 'rating') appSettings.auswertungRatingAgg = agg === 'sum' ? 'sum' : 'avg';
-  else return;
+  if (auswertungSortMode() !== 'duration') return;
+  appSettings.auswertungDurationAgg = agg === 'avg' ? 'avg' : 'sum';
   saveToStorage();
   renderAuswertung();
 }
-// Locations ohne Bewertung/Dauer (Sentinel -1) landen im jeweiligen Modus
-// immer am Ende - unabhängig vom Vorzeichen der Skala. Bei "Summe" ist 0 ein
-// gültiger, natürlich niedrigster Wert (keine Sonderbehandlung nötig); bei
-// "Durchschnitt" dagegen ist "kein Wert vorhanden" von "0" zu unterscheiden.
+// Locations ohne Bewertung (avgRating === null) landen im Bewertungs-Modus
+// immer am Ende, Locations ohne Dauer im Durchschnitts-Modus ebenso -
+// unabhängig vom Vorzeichen der jeweiligen Skala.
 function compareLocations(mode) {
   const agg = auswertungAggMode(mode);
   return (x, y) => {
@@ -1109,9 +1104,8 @@ function compareLocations(mode) {
       return (yv - xv) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
     }
     if (mode === 'rating') {
-      const xv = agg === 'sum' ? x.ratingSum : (x.avgRating === null ? -1 : x.avgRating);
-      const yv = agg === 'sum' ? y.ratingSum : (y.avgRating === null ? -1 : y.avgRating);
-      return (yv - xv) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
+      const xr = x.avgRating === null ? -1 : x.avgRating, yr = y.avgRating === null ? -1 : y.avgRating;
+      return (yr - xr) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
     }
     return (y.count - x.count) || (y.minutes - x.minutes) || x.location.localeCompare(y.location, 'de');
   };
@@ -1253,18 +1247,17 @@ function auswertungBlockHTML(title, id, entries) {
     body = '<div class="ausw-empty">Noch keine besuchten Auftritte.</div>';
   } else {
     const mode = auswertungSortMode();
-    const agg = auswertungAggMode(mode); // null bei 'count'
+    const agg = auswertungAggMode(mode); // nur bei 'duration' nicht null
     // Metrik je Modus+Aggregation, für Balken UND Anzeige einheitlich verwendet.
     const metricOf = l => {
       if (mode === 'duration') return agg === 'avg' ? (l.durationCount ? l.minutes / l.durationCount : null) : l.minutes;
-      if (mode === 'rating') return agg === 'sum' ? l.ratingSum : l.avgRating;
+      if (mode === 'rating') return l.avgRating;
       return l.count;
     };
-    // Balken: bei "Durchschnitt der Bewertung" ist die Skala fix (1-5 Sterne) ->
-    // absolute Position auf dieser Skala. In allen anderen Fällen (Häufigkeit,
-    // Dauer in beiden Varianten, Bewertungs-SUMME) gibt es keine feste Obergrenze,
-    // der Balken ist daher relativ zum Erstplatzierten (Sortierkriterium).
-    const isAbsoluteRatingBar = mode === 'rating' && agg !== 'sum';
+    // Balken: bei "Bewertung" ist die Skala fix (1-5 Sterne) -> absolute Position
+    // auf dieser Skala. Bei Häufigkeit und Dauer (beide Varianten) gibt es keine
+    // feste Obergrenze, der Balken ist daher relativ zum Erstplatzierten.
+    const isAbsoluteRatingBar = mode === 'rating';
     const barMax = isAbsoluteRatingBar ? null : (metricOf(s.locations[0]) || 0);
     const barPct = l => {
       if (isAbsoluteRatingBar) return l.avgRating === null ? 0 : Math.round(l.avgRating / 5 * 100);
@@ -1295,7 +1288,7 @@ function auswertungBlockHTML(title, id, entries) {
             ? (agg === 'avg' ? (l.durationCount > 0 ? `${l.durationCount}×` : '') : `${l.count}×`)
             : (l.minutes > 0 ? formatDuration(l.minutes) : '');
         const main = mode === 'rating'
-          ? (agg === 'sum' ? (l.ratingCount > 0 ? String(l.ratingSum) : '–') : (l.avgRating === null ? '–' : l.avgRating.toFixed(1)))
+          ? (l.avgRating === null ? '–' : l.avgRating.toFixed(1))
           : mode === 'duration'
             ? (agg === 'avg' ? (l.durationCount > 0 ? formatDuration(Math.round(l.minutes / l.durationCount)) : '–') : (l.minutes > 0 ? formatDuration(l.minutes) : '–'))
             : `${l.count}×`;

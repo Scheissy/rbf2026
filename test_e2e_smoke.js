@@ -118,11 +118,11 @@ const { loadApp, createChecker } = require('./test-helpers');
     w.closeAuswertungInfoModal();
   });
 
-  step('Auswertung: alle drei Sortierungen (inkl. Bewertung) durchschalten', () => {
+  step('Auswertung: alle drei Sortierungen durchschalten, Summe/Durchschnitt bei Dauer testen', () => {
     w.setAuswertungSort('duration');
     w.setAuswertungAgg('avg');
-    w.setAuswertungSort('rating');
     w.setAuswertungAgg('sum');
+    w.setAuswertungSort('rating');
     w.setAuswertungSort('count');
   });
 
