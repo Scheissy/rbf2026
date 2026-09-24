@@ -137,6 +137,11 @@ const { loadApp, createChecker } = require('./test-helpers');
     if (head) { head.click(); head.click(); }
   });
 
+  step('Auswertung: eine Genre-Zeile auf- und wieder zuklappen', () => {
+    const head = d.querySelector('.ausw-genre .ausw-loc-head');
+    if (head) { head.click(); head.click(); }
+  });
+
   step('In den Settings-Tab (io) wechseln', () => {
     w.switchTab('io');
   });

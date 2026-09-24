@@ -252,7 +252,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .ausw-kpi-val { font-size: 18px; font-weight: 700; color: var(--text); }
 .ausw-kpi-label { font-size: 11px; color: var(--text2); }
 .ausw-sub { padding: 0 14px 6px; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
-.ausw-loc-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 9px; }
+.ausw-loc-list, .ausw-genre-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 9px; }
 .ausw-loc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--text); }
 .ausw-loc-meta { color: var(--text2); font-size: 11px; white-space: nowrap; }
 .ausw-loc-main { color: var(--accent); font-weight: 700; margin-left: 6px; }
@@ -702,7 +702,8 @@ input[type=file] { display: none; }
     <div class="modal-body" style="font-size:14px;line-height:1.5">
       <p style="margin:0 0 10px"><b>Wann zählt ein Auftritt als besucht?</b><br>Sobald eine <b>Dauer</b> eingetragen <i>oder</i> der Auftritt <b>bewertet</b> wurde - eines von beiden genügt.</p>
       <p style="margin:0 0 10px"><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages - ohne Wege zu Hotel, Essen usw., also eine Untergrenze. <span id="auswertungInfoWalkNote"></span></p>
-      <p style="margin:0"><b>⭐ Bewertungen</b><br>Verteilung und Location-Sortierung nutzen ausschließlich die <b>Auftritts-Bewertung</b>, nicht die künstlerbezogene Promo-/Listening-Bewertung.</p>
+      <p style="margin:0 0 10px"><b>⭐ Bewertungen</b><br>Verteilung und Location-Sortierung nutzen ausschließlich die <b>Auftritts-Bewertung</b>, nicht die künstlerbezogene Promo-/Listening-Bewertung.</p>
+      <p style="margin:0"><b>🎵 Genres</b><br>Ein Auftritt mit mehreren Genres (z.B. "Electro / Pop") zählt in <b>jedem</b> davon separat - genau wie beim Genre-Filter in der Programm-Übersicht. Die Summe der Genre-Häufigkeiten kann daher höher sein als die Anzahl besuchter Auftritte.</p>
     </div>
   </div>
 </div>
@@ -1095,49 +1096,70 @@ function setAuswertungAgg(agg) {
 // Locations ohne Bewertung (avgRating === null) landen im Bewertungs-Modus
 // immer am Ende, Locations ohne Dauer im Durchschnitts-Modus ebenso -
 // unabhängig vom Vorzeichen der jeweiligen Skala.
-function compareLocations(mode) {
+// Generischer Vergleicher für aggregierte Auswertungs-Zeilen (Locations UND
+// Genres teilen sich dieselbe Form: count/minutes/durationCount/ratingSum/
+// ratingCount/avgRating + ein Namensfeld). nameKey wählt das Namensfeld für
+// den letzten Tie-Breaker (alphabetisch).
+function compareAggregated(mode, nameKey) {
   const agg = auswertungAggMode(mode);
   return (x, y) => {
     if (mode === 'duration') {
       const xv = agg === 'avg' ? (x.durationCount ? x.minutes / x.durationCount : -1) : x.minutes;
       const yv = agg === 'avg' ? (y.durationCount ? y.minutes / y.durationCount : -1) : y.minutes;
-      return (yv - xv) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
+      return (yv - xv) || (y.count - x.count) || x[nameKey].localeCompare(y[nameKey], 'de');
     }
     if (mode === 'rating') {
       const xr = x.avgRating === null ? -1 : x.avgRating, yr = y.avgRating === null ? -1 : y.avgRating;
-      return (yr - xr) || (y.count - x.count) || x.location.localeCompare(y.location, 'de');
+      return (yr - xr) || (y.count - x.count) || x[nameKey].localeCompare(y[nameKey], 'de');
     }
-    return (y.count - x.count) || (y.minutes - x.minutes) || x.location.localeCompare(y.location, 'de');
+    return (y.count - x.count) || (y.minutes - x.minutes) || x[nameKey].localeCompare(y[nameKey], 'de');
   };
 }
+function compareLocations(mode) { return compareAggregated(mode, 'location'); }
+function compareGenres(mode) { return compareAggregated(mode, 'genre'); }
 function auswertungStats(entries, sortMode) {
   const visited = entries.filter(isShowVisited);
   let totalMinutes = 0, ratingSum = 0, ratingCount = 0;
   const ratingDist = [0, 0, 0, 0, 0]; // Index 0 = 1 Stern ... Index 4 = 5 Sterne
   const ratingEntries = [[], [], [], [], []]; // dieselbe Indizierung: welche Auftritte stecken dahinter
-  const byLoc = {};
+  const byLoc = {}, byGenre = {};
   const chronoCompare = (x, y) => dayIndex(x.day) - dayIndex(y.day) || timeSortValue(x.time) - timeSortValue(y.time) || x.name.localeCompare(y.name, 'de');
-  visited.forEach(a => {
-    const k = showKey(a);
-    const dur = showDurations[k] || 0, r = showRatings[k] || 0;
-    totalMinutes += dur;
-    const loc = (a.location || '').trim() || 'Ohne Location';
-    const e = byLoc[loc] || (byLoc[loc] = { location: loc, count: 0, minutes: 0, durationCount: 0, ratingSum: 0, ratingCount: 0, entries: [] });
+  // Trägt einen Auftritt in eine Gruppe (Location ODER Genre) ein - identische
+  // Feldstruktur für beide, damit compareAggregated()/die Anzeige beides
+  // gleich behandeln kann.
+  function addTo(map, key, nameField, a, dur, r) {
+    const e = map[key] || (map[key] = { [nameField]: key, count: 0, minutes: 0, durationCount: 0, ratingSum: 0, ratingCount: 0, entries: [] });
     e.count++;
     e.minutes += dur;
     if (dur > 0) e.durationCount++;
     e.entries.push(a);
+    if (r > 0) { e.ratingSum += r; e.ratingCount++; }
+  }
+  visited.forEach(a => {
+    const k = showKey(a);
+    const dur = showDurations[k] || 0, r = showRatings[k] || 0;
+    totalMinutes += dur;
+    addTo(byLoc, (a.location || '').trim() || 'Ohne Location', 'location', a, dur, r);
+    // Ein Auftritt mit mehreren Genres ("Electro / Pop") zählt in JEDEM davon
+    // separat - exakt wie beim Genre-Mehrfachfilter in der Programm-Übersicht
+    // (toggleProgGenreSelection()), nicht als ein zusammengesetztes Genre.
+    // Sonderveranstaltungen und Künstler ohne Genre-Angabe laufen unter
+    // "Ohne Genre" (analog zu "Ohne Location").
+    const artistData = dataMap[a.name];
+    const genreTags = artistData && artistData.genre ? splitTags(artistData.genre) : [];
+    (genreTags.length ? genreTags : ['Ohne Genre']).forEach(g => addTo(byGenre, g, 'genre', a, dur, r));
     if (r > 0) {
       ratingSum += r; ratingCount++;
       const bucket = Math.min(Math.max(Math.round(r), 1), 5) - 1;
       ratingDist[bucket]++;
       ratingEntries[bucket].push(a);
-      e.ratingSum += r; e.ratingCount++;
     }
   });
-  const locations = Object.values(byLoc).map(e => ({ ...e, avgRating: e.ratingCount ? e.ratingSum / e.ratingCount : null, entries: e.entries.slice().sort(chronoCompare) }))
-    .sort(compareLocations(sortMode || auswertungSortMode()));
-  return { visitedCount: visited.length, totalMinutes, avgRating: ratingCount ? ratingSum / ratingCount : null, ratingCount, ratingDist, ratingEntries: ratingEntries.map(list => list.slice().sort(chronoCompare)), locations };
+  const finalize = (map, compareFn) => Object.values(map).map(e => ({ ...e, avgRating: e.ratingCount ? e.ratingSum / e.ratingCount : null, entries: e.entries.slice().sort(chronoCompare) })).sort(compareFn);
+  const mode = sortMode || auswertungSortMode();
+  const locations = finalize(byLoc, compareLocations(mode));
+  const genres = finalize(byGenre, compareGenres(mode));
+  return { visitedCount: visited.length, totalMinutes, avgRating: ratingCount ? ratingSum / ratingCount : null, ratingCount, ratingDist, ratingEntries: ratingEntries.map(list => list.slice().sort(chronoCompare)), locations, genres };
 }
 // Eine Zeile in einer aufgeklappten Detail-Liste (welche Auftritte hinter
 // einer Zahl in der Auswertung stecken) - zeigt Tag/Zeit, Name und, falls
@@ -1248,7 +1270,8 @@ function auswertungBlockHTML(title, id, entries) {
   } else {
     const mode = auswertungSortMode();
     const agg = auswertungAggMode(mode); // nur bei 'duration' nicht null
-    // Metrik je Modus+Aggregation, für Balken UND Anzeige einheitlich verwendet.
+    // Metrik je Modus+Aggregation, für Balken UND Anzeige einheitlich verwendet -
+    // gilt gleichermaßen für Locations UND Genres (identische Feldstruktur).
     const metricOf = l => {
       if (mode === 'duration') return agg === 'avg' ? (l.durationCount ? l.minutes / l.durationCount : null) : l.minutes;
       if (mode === 'rating') return l.avgRating;
@@ -1256,13 +1279,35 @@ function auswertungBlockHTML(title, id, entries) {
     };
     // Balken: bei "Bewertung" ist die Skala fix (1-5 Sterne) -> absolute Position
     // auf dieser Skala. Bei Häufigkeit und Dauer (beide Varianten) gibt es keine
-    // feste Obergrenze, der Balken ist daher relativ zum Erstplatzierten.
+    // feste Obergrenze, der Balken ist daher relativ zum jeweils Erstplatzierten
+    // DER EIGENEN Liste (Locations und Genres haben getrennte Höchstwerte).
     const isAbsoluteRatingBar = mode === 'rating';
-    const barMax = isAbsoluteRatingBar ? null : (metricOf(s.locations[0]) || 0);
-    const barPct = l => {
-      if (isAbsoluteRatingBar) return l.avgRating === null ? 0 : Math.round(l.avgRating / 5 * 100);
-      const v = metricOf(l);
-      return (barMax > 0 && v) ? Math.round(v / barMax * 100) : 0;
+    const makeBarPct = list => {
+      const barMax = isAbsoluteRatingBar ? null : (list.length ? (metricOf(list[0]) || 0) : 0);
+      return l => {
+        if (isAbsoluteRatingBar) return l.avgRating === null ? 0 : Math.round(l.avgRating / 5 * 100);
+        const v = metricOf(l);
+        return (barMax > 0 && v) ? Math.round(v / barMax * 100) : 0;
+      };
+    };
+    // Eine Zeile (Location ODER Genre) - identisches Markup, nur der Name und
+    // die äußere Klasse (für die Zuordnung zum jeweiligen Abschnitt) wechseln.
+    const rowHTML = (item, nameField, outerClass, barPct) => {
+      const meta = mode === 'rating'
+        ? (item.ratingCount > 0 ? `${item.ratingCount}×` : '')
+        : mode === 'duration'
+          ? (agg === 'avg' ? (item.durationCount > 0 ? `${item.durationCount}×` : '') : `${item.count}×`)
+          : (item.minutes > 0 ? formatDuration(item.minutes) : '');
+      const main = mode === 'rating'
+        ? (item.avgRating === null ? '–' : item.avgRating.toFixed(1))
+        : mode === 'duration'
+          ? (agg === 'avg' ? (item.durationCount > 0 ? formatDuration(Math.round(item.minutes / item.durationCount)) : '–') : (item.minutes > 0 ? formatDuration(item.minutes) : '–'))
+          : `${item.count}×`;
+      return `<div class="${outerClass}" data-count="${item.count}" data-minutes="${item.minutes}" data-avg-rating="${item.avgRating === null ? '' : item.avgRating}">
+        <div class="ausw-loc-head" onclick="toggleAuswDetail(this)"><span>${escapeHtml(item[nameField])}</span><span><span class="ausw-loc-meta">${meta}</span><span class="ausw-loc-main">${main}</span><span class="ausw-expand-arrow">▸</span></span></div>
+        <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(item)}%"></div></div>
+        <div class="ausw-expand-detail collapsed">${item.entries.map(auswEntryLineHTML).join('')}</div>
+      </div>`;
     };
     const kpi = (val, label, attrs = '') => `<div class="ausw-kpi"${attrs}><div class="ausw-kpi-val">${val}</div><div class="ausw-kpi-label">${label}</div></div>`;
     const walk = walkStats(entries);
@@ -1270,6 +1315,8 @@ function auswertungBlockHTML(title, id, entries) {
     const walkNote = walk.skipped > 0
       ? `<div class="ausw-note">ℹ️ ${walk.skipped === 1 ? '1 besuchter Auftritt ist' : `${walk.skipped} besuchte Auftritte sind`} (ohne Uhrzeit oder Koordinaten) in der Strecke nicht enthalten.</div>`
       : '';
+    const locBarPct = makeBarPct(s.locations);
+    const genreBarPct = makeBarPct(s.genres);
     body = `<div class="ausw-kpis">
         ${kpi(s.visitedCount, 'Auftritte besucht')}
         ${kpi(s.totalMinutes > 0 ? formatDuration(s.totalMinutes) : '–', 'Zeit vor Ort')}
@@ -1278,26 +1325,11 @@ function auswertungBlockHTML(title, id, entries) {
       </div>
       ${walkNote}
       <div class="ausw-sub">📍 Locations</div>
-      <div class="ausw-loc-list">${s.locations.map(l => {
-        // Nebenwert (Kontext, klein): bei Durchschnitts-Werten die Anzahl der
-        // EINGEFLOSSENEN Angaben (nicht aller Besuche), bei Summen/Häufigkeit
-        // wie gehabt Anzahl bzw. Dauer.
-        const meta = mode === 'rating'
-          ? (l.ratingCount > 0 ? `${l.ratingCount}×` : '')
-          : mode === 'duration'
-            ? (agg === 'avg' ? (l.durationCount > 0 ? `${l.durationCount}×` : '') : `${l.count}×`)
-            : (l.minutes > 0 ? formatDuration(l.minutes) : '');
-        const main = mode === 'rating'
-          ? (l.avgRating === null ? '–' : l.avgRating.toFixed(1))
-          : mode === 'duration'
-            ? (agg === 'avg' ? (l.durationCount > 0 ? formatDuration(Math.round(l.minutes / l.durationCount)) : '–') : (l.minutes > 0 ? formatDuration(l.minutes) : '–'))
-            : `${l.count}×`;
-        return `<div class="ausw-loc" data-count="${l.count}" data-minutes="${l.minutes}" data-avg-rating="${l.avgRating === null ? '' : l.avgRating}">
-        <div class="ausw-loc-head" onclick="toggleAuswDetail(this)"><span>${escapeHtml(l.location)}</span><span><span class="ausw-loc-meta">${meta}</span><span class="ausw-loc-main">${main}</span><span class="ausw-expand-arrow">▸</span></span></div>
-        <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(l)}%"></div></div>
-        <div class="ausw-expand-detail collapsed">${l.entries.map(auswEntryLineHTML).join('')}</div>
-      </div>`;
-      }).join('')}</div>
+      <div class="ausw-loc-list">${s.locations.map(l => rowHTML(l, 'location', 'ausw-loc', locBarPct)).join('')}</div>
+      <div class="ausw-sub">🎵 Genres</div>
+      ${s.genres.length === 0
+        ? '<div class="ausw-empty">Keine Genre-Angaben vorhanden.</div>'
+        : `<div class="ausw-genre-list">${s.genres.map(g => rowHTML(g, 'genre', 'ausw-genre', genreBarPct)).join('')}</div>`}
       <div class="ausw-sub">⭐ Bewertungsverteilung</div>
       ${s.ratingCount === 0
         ? '<div class="ausw-empty">Noch keine Bewertungen abgegeben.</div>'
