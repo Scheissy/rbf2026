@@ -142,6 +142,10 @@ const { loadApp, createChecker } = require('./test-helpers');
     if (head) { head.click(); head.click(); }
   });
 
+  step('Auswertung: "Größte Wege" wird ohne Fehler mitgerendert', () => {
+    w.renderAuswertung();
+  });
+
   step('In den Settings-Tab (io) wechseln', () => {
     w.switchTab('io');
   });

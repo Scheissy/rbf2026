@@ -253,6 +253,7 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .ausw-kpi-label { font-size: 11px; color: var(--text2); }
 .ausw-sub { padding: 0 14px 6px; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
 .ausw-loc-list, .ausw-genre-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 9px; }
+.ausw-walklegs-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
 .ausw-loc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--text); }
 .ausw-loc-meta { color: var(--text2); font-size: 11px; white-space: nowrap; }
 .ausw-loc-main { color: var(--accent); font-weight: 700; margin-left: 6px; }
@@ -701,7 +702,7 @@ input[type=file] { display: none; }
     </div>
     <div class="modal-body" style="font-size:14px;line-height:1.5">
       <p style="margin:0 0 10px"><b>Wann zählt ein Auftritt als besucht?</b><br>Sobald eine <b>Dauer</b> eingetragen <i>oder</i> der Auftritt <b>bewertet</b> wurde - eines von beiden genügt.</p>
-      <p style="margin:0 0 10px"><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages - ohne Wege zu Hotel, Essen usw., also eine Untergrenze. <span id="auswertungInfoWalkNote"></span></p>
+      <p style="margin:0 0 10px"><b>🚶 Strecke</b><br>Weg zwischen aufeinanderfolgenden besuchten Auftritten eines Tages - ohne Wege zu Hotel, Essen usw., also eine Untergrenze. <span id="auswertungInfoWalkNote"></span> "Größte Wege" zeigt die 5 weitesten einzelnen Strecken.</p>
       <p style="margin:0 0 10px"><b>⭐ Bewertungen</b><br>Verteilung und Location-Sortierung nutzen ausschließlich die <b>Auftritts-Bewertung</b>, nicht die künstlerbezogene Promo-/Listening-Bewertung.</p>
       <p style="margin:0"><b>🎵 Genres</b><br>Ein Auftritt mit mehreren Genres (z.B. "Electro / Pop") zählt in <b>jedem</b> davon separat - genau wie beim Genre-Filter in der Programm-Übersicht. Die Summe der Genre-Häufigkeiten kann daher höher sein als die Anzahl besuchter Auftritte.</p>
     </div>
@@ -1245,6 +1246,7 @@ function walkStats(entries) {
   const byDay = {};
   entries.filter(isShowVisited).forEach(a => { (byDay[a.day] = byDay[a.day] || []).push(a); });
   let meters = 0, legs = 0, airLegs = 0, skipped = 0;
+  const legList = []; // einzelne Wegstrecken (für "Größte Wege" in der Auswertung)
   Object.values(byDay).forEach(list => {
     const stops = list
       .filter(a => a.time && venueHasGeo((a.location || '').trim()))
@@ -1256,10 +1258,24 @@ function walkStats(entries) {
       meters += w.meters;
       legs++;
       if (!w.exact) airLegs++;
+      legList.push({ day: stops[i].day, from: stops[i - 1], to: stops[i], meters: w.meters, exact: w.exact });
     }
   });
   const kind = legs === 0 ? 'none' : airLegs === 0 ? 'walk' : airLegs === legs ? 'air' : 'mixed';
-  return { meters, legs, airLegs, skipped, kind };
+  return { meters, legs, airLegs, skipped, kind, legList };
+}
+// Eine Zeile in "Größte Wege": von welchem zu welchem Auftritt, wie weit -
+// mit Hinweis, falls diese EINZELNE Strecke (anders als der Rest) nur als
+// Luftlinie vorliegt (z.B. weil für eine der beiden Locations keine
+// Fußweg-Matrix-Daten vorhanden sind, siehe walkMeters()).
+function auswWalkLegLineHTML(leg) {
+  const fromTime = leg.from.time ? escapeHtml(leg.from.time) : 'TBA';
+  const toTime = leg.to.time ? escapeHtml(leg.to.time) : 'TBA';
+  return `<div class="ausw-expand-item">
+    <span class="ausw-expand-time">${escapeHtml(leg.day)} · ${fromTime} → ${toTime}</span>
+    <span class="ausw-expand-name">${escapeHtml(leg.from.name)} → ${escapeHtml(leg.to.name)}</span>
+    <span class="ausw-expand-meta">${formatMeters(leg.meters)}${leg.exact ? '' : ' <i>(Luftlinie)</i>'}</span>
+  </div>`;
 }
 
 function auswertungBlockHTML(title, id, entries) {
@@ -1324,6 +1340,10 @@ function auswertungBlockHTML(title, id, entries) {
         ${kpi(walk.legs > 0 ? formatMeters(walk.meters) : '–', walkLabel, ` data-walk-kind="${walk.kind}"`)}
       </div>
       ${walkNote}
+      <div class="ausw-sub">🚶 Größte Wege</div>
+      ${walk.legs === 0
+        ? '<div class="ausw-empty">Keine Wege berechenbar.</div>'
+        : `<div class="ausw-walklegs-list">${walk.legList.slice().sort((a, b) => b.meters - a.meters || dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.to.time) - timeSortValue(b.to.time)).slice(0, 5).map(auswWalkLegLineHTML).join('')}</div>`}
       <div class="ausw-sub">📍 Locations</div>
       <div class="ausw-loc-list">${s.locations.map(l => rowHTML(l, 'location', 'ausw-loc', locBarPct)).join('')}</div>
       <div class="ausw-sub">🎵 Genres</div>

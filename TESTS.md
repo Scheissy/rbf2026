@@ -40,13 +40,14 @@ mit der Zeit ihren Nutzen.
 | `test_auswertung_sort.js` | Sortier-Option im Location-Ranking (Häufigkeit/Dauer): Tie-Breaker (Häufigkeit -> Dauer -> Name bzw. Dauer -> Häufigkeit -> Name), Balken/Werte je Modus, gezielte Tages-Auswahl, Locations ohne Dauer, Scroll-Erhalt, Persistenz über Neustart, Unabhängigkeit von Reset/"Jetzt", ungültige Werte. |
 | `test_preview_build.js` | Preview-Build (`build-preview.py`): `preview.html` entsteht aus `index.html` + Testdaten, läuft fehlerfrei, nutzt `__previewStorage` statt `localStorage` und enthält dieselben Features (4 Tabs) wie die App. |
 | `test_walk_distance.js` | Wegstrecke im Auswertung-Tab: Kette der besuchten Auftritte je Tag (Zeiten nach Mitternacht korrekt sortiert, Wege nie über Tagesgrenzen, auch bei mehreren ausgewählten Tagen), Haversine gegen unabhängige Referenz, Fußweg-Matrix vs. Luftlinie-Fallback vs. gemischt (Kennzeichnung), Alias-Locations, Auftritte ohne Koordinaten/Uhrzeit (Hinweis), Quellenangabe im Info-Modal. Nutzt eigene Testdaten + `walkScript`. |
+| `test_walk_top_legs.js` | Neuer Abschnitt "Größte Wege" in der Auswertung: zeigt die 5 weitesten einzelnen Strecken absteigend sortiert, Kappung bei mehr als 5 vorhandenen (kleinste fällt raus), "(Luftlinie)"-Kennzeichen pro EINZELNER Strecke (nicht global für den Tag), reagiert auf die Tages-Auswahl, Leer-Hinweis ohne besuchte Auftritte. |
 | `test_walk_matrix_script.js` | `build-walk-matrix.js` gegen einen simulierten OSRM-Server (kein Netz): eine Table-Anfrage, Punkt-Deduplizierung, Dateiformat + Kompatibilität mit der App, Fehlerfälle (falscher Code, HTTP 429, fehlende Routen, Auto-Profil/asymmetrisch, unmögliche Wege, >100 Punkte), `--force`, Fallback ohne globales `fetch` (Node < 18) gegen lokalen HTTP-Server, verständliche Meldungen bei Verbindungsfehlern (DNS, Zertifikat, Timeout, Abbruch). |
 | `test_sw_assets.js` | Service Worker: `rbf-walk.js` in ASSETS, Network-First wie `rbf-data.js`, Cache-Name hochgezählt. |
 
 ## Hilfsdateien
 
 - `test-helpers.js` - gemeinsame Helfer (`loadApp()` inkl. Option `walkScript`, `reloadWithState()`,
-  `createChecker()`). Alle 32 Testdateien oben nutzen diese Helfer bereits
+  `createChecker()`). Alle 33 Testdateien oben nutzen diese Helfer bereits
   (Migration in 8 Runden abgeschlossen) - Boilerplate wurde dabei um
   durchschnittlich ca. 43 % pro Datei reduziert, die eigentliche Prüf-Logik
   blieb inhaltlich unverändert.
