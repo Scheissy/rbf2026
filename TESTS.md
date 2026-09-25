@@ -33,6 +33,7 @@ mit der Zeit ihren Nutzen.
 | `test_gender_abbreviation.js` | `shortenGeschlecht()`: Kollisionsfreie Kurzformen (w/m/d/mix), nur in der Künstler-Übersicht. |
 | `test_auswertung.js` | Auswertung-Tab (4. Bottom-Nav-Tab): dynamische Tages-Auswahl (Mi/Do/Fr/Sa einzeln an-/abwählbar, EINE Übersicht statt fester Gesamt+Tage-Blöcke, Daten werden über die gewählten Tage hinweg summiert), Default = alle Tage ("Gesamt"), leere Auswahl, Titel je nach Auswahl, Persistenz, Fallback bei Datenupdate (gespeicherte Tage existieren nicht mehr), Definition "besucht" (Dauer ODER Auftritts-Bewertung; Ziel-Flag/Künstler-"gesehen" zählen nicht), Location-Ranking + Balken, Kennzahlen (Anzahl/Zeit/Ø), Events (inkl. globalem Schalter), Unabhängigkeit von Filtern/Ausblenden, Scroll-Erhalt. |
 | `test_auswertung_agg.js` | Summe/Durchschnitt-Umschalter NUR bei "Dauer" (bei "Häufigkeit" und bewusst auch bei "Bewertung" kein Umschalter - die Summe von Sternebewertungen ist keine aussagekräftige Größe): Standardwert Summe, Anzeige + Balkenskalierung je Variante, Ø nur über Einträge MIT eingetragener Dauer, Persistenz, Bewertung bleibt fest beim (absolut skalierten) Durchschnitt. |
+| `test_auswertung_layout.js` | Reihenfolge im Auswertung-Block: Sortier-Buttons stehen unmittelbar vor "Locations" (nicht mehr weit oben getrennt durch Kennzahlen/Strecke), "Größte Wege" steht am Ende (nach Locations/Genres/Bewertungsverteilung, nicht mehr direkt am Anfang), Buttons an der neuen Position weiterhin funktionsfähig. |
 | `test_auswertung_genre.js` | Genre-Auswertung im Auswertung-Tab: Mehrfach-Genres ("Electro / Pop") werden in EINZELNE Tags zerlegt und zählen in jedem separat (wie beim Genre-Filter), Summe der Genre-Häufigkeiten übersteigt bewusst die Anzahl besuchter Auftritte, Events ohne Genre unter "Ohne Genre", folgt demselben Sortier-Umschalter wie Locations, aufklappbare Detail-Liste, Zusammenspiel mit Tages-Auswahl. |
 | `test_auswertung_expand.js` | Aufklappbare Detail-Listen in der Auswertung: Location-Zeilen und Bewertungsverteilungs-Zeilen zeigen beim Aufklappen die zugrunde liegenden Auftritte (chronologisch, mit Dauer/Bewertung falls vorhanden), Pfeil-Umschaltung, Zeilen unabhängig voneinander, leere Bewertungsstufen ohne Pfeil/Detail, rein clientseitiger (nicht persistenter) Zustand. |
 | `test_auswertung_info_modal.js` | Auswertung-Tab: kompakter Header (Titel + ⓘ-Icon) statt der früheren, dauerhaft sichtbaren Info-Box; Modal-Inhalt, Öffnen/Schließen (Icon-Klick, Backdrop, Karte selbst), dynamischer Fußweg-Hinweis, bleibt nach Neu-Rendern funktionsfähig. |
@@ -48,7 +49,7 @@ mit der Zeit ihren Nutzen.
 ## Hilfsdateien
 
 - `test-helpers.js` - gemeinsame Helfer (`loadApp()` inkl. Option `walkScript`, `reloadWithState()`,
-  `createChecker()`). Alle 34 Testdateien oben nutzen diese Helfer bereits
+  `createChecker()`). Alle 35 Testdateien oben nutzen diese Helfer bereits
   (Migration in 8 Runden abgeschlossen) - Boilerplate wurde dabei um
   durchschnittlich ca. 43 % pro Datei reduziert, die eigentliche Prüf-Logik
   blieb inhaltlich unverändert.

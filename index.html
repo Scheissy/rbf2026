@@ -1340,10 +1340,18 @@ function auswertungBlockHTML(title, id, entries) {
         ${kpi(walk.legs > 0 ? formatMeters(walk.meters) : '–', walkLabel, ` data-walk-kind="${walk.kind}"`)}
       </div>
       ${walkNote}
-      <div class="ausw-sub">🚶 Größte Wege</div>
-      ${walk.legs === 0
-        ? '<div class="ausw-empty">Keine Wege berechenbar.</div>'
-        : `<div class="ausw-walklegs-list">${walk.legList.slice().sort((a, b) => b.meters - a.meters || dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.to.time) - timeSortValue(b.to.time)).slice(0, 5).map(auswWalkLegLineHTML).join('')}</div>`}
+      <div class="ausw-sort"><span class="ausw-sort-label">📍 Locations/Genres sortieren nach</span>
+        <div class="ausw-sort-btns">
+          <button class="ausw-sort-btn${mode === 'count' ? ' active' : ''}" data-sort="count" onclick="setAuswertungSort('count')">Häufigkeit</button>
+          <button class="ausw-sort-btn${mode === 'duration' ? ' active' : ''}" data-sort="duration" onclick="setAuswertungSort('duration')">Dauer</button>
+          <button class="ausw-sort-btn${mode === 'rating' ? ' active' : ''}" data-sort="rating" onclick="setAuswertungSort('rating')">Bewertung</button>
+        </div></div>
+      <div class="ausw-note">Bei Gleichstand zählt die jeweils andere Größe, danach der Name.</div>
+      ${agg !== null ? `<div class="ausw-sort"><span class="ausw-sort-label">Anzeigen als</span>
+        <div class="ausw-sort-btns">
+          <button class="ausw-sort-btn${agg === 'sum' ? ' active' : ''}" data-agg="sum" onclick="setAuswertungAgg('sum')">Summe</button>
+          <button class="ausw-sort-btn${agg === 'avg' ? ' active' : ''}" data-agg="avg" onclick="setAuswertungAgg('avg')">Durchschnitt</button>
+        </div></div>` : ''}
       <div class="ausw-sub">📍 Locations</div>
       <div class="ausw-loc-list">${s.locations.map(l => rowHTML(l, 'location', 'ausw-loc', locBarPct)).join('')}</div>
       <div class="ausw-sub">🎵 Genres</div>
@@ -1365,7 +1373,11 @@ function auswertungBlockHTML(title, id, entries) {
               </div>
               ${c > 0 ? `<div class="ausw-expand-detail collapsed">${s.ratingEntries[n - 1].map(auswEntryLineHTML).join('')}</div>` : ''}
             </div>`;
-          }).join('')}</div>`}`;
+          }).join('')}</div>`}
+      <div class="ausw-sub">🚶 Größte Wege</div>
+      ${walk.legs === 0
+        ? '<div class="ausw-empty">Keine Wege berechenbar.</div>'
+        : `<div class="ausw-walklegs-list">${walk.legList.slice().sort((a, b) => b.meters - a.meters || dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.to.time) - timeSortValue(b.to.time)).slice(0, 5).map(auswWalkLegLineHTML).join('')}</div>`}`;
   }
   return `<div class="io-section ausw-block" data-ausw="${escapeHtml(id)}"><div class="io-section-title">${escapeHtml(title)}</div>${body}</div>`;
 }
@@ -1386,20 +1398,6 @@ function renderAuswertung() {
   if (selectedDays.length === 0) {
     html += `<div class="ausw-empty">Kein Tag ausgewählt - bitte mindestens einen Tag antippen.</div>`;
   } else {
-    const mode = auswertungSortMode();
-    const agg = auswertungAggMode(mode);
-    html += `<div class="ausw-sort"><span class="ausw-sort-label">📍 Locations sortieren nach</span>
-        <div class="ausw-sort-btns">
-          <button class="ausw-sort-btn${mode === 'count' ? ' active' : ''}" data-sort="count" onclick="setAuswertungSort('count')">Häufigkeit</button>
-          <button class="ausw-sort-btn${mode === 'duration' ? ' active' : ''}" data-sort="duration" onclick="setAuswertungSort('duration')">Dauer</button>
-          <button class="ausw-sort-btn${mode === 'rating' ? ' active' : ''}" data-sort="rating" onclick="setAuswertungSort('rating')">Bewertung</button>
-        </div></div>
-      <div class="ausw-note">Bei Gleichstand zählt die jeweils andere Größe, danach der Name.</div>
-      ${agg !== null ? `<div class="ausw-sort"><span class="ausw-sort-label">Anzeigen als</span>
-        <div class="ausw-sort-btns">
-          <button class="ausw-sort-btn${agg === 'sum' ? ' active' : ''}" data-agg="sum" onclick="setAuswertungAgg('sum')">Summe</button>
-          <button class="ausw-sort-btn${agg === 'avg' ? ' active' : ''}" data-agg="avg" onclick="setAuswertungAgg('avg')">Durchschnitt</button>
-        </div></div>` : ''}`;
     html += auswertungBlockHTML(auswertungSelectionTitle(selectedDays), 'auswahl', entries);
   }
   // Scroll-Position erhalten (Pixel-Offset): der Inhalt wird bei jeder Interaktion
