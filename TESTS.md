@@ -48,8 +48,8 @@ mit der Zeit ihren Nutzen.
 
 ## Hilfsdateien
 
-- `test-helpers.js` - gemeinsame Helfer (`loadApp()` inkl. Option `walkScript`, `reloadWithState()`,
-  `createChecker()`). Alle 35 Testdateien oben nutzen diese Helfer bereits
+- `test-helpers.js` - gemeinsame Helfer: `loadApp()` (inkl. Option `walkScript`), `reloadWithState()`,
+  `createChecker()`). Außerdem für den Auswertung-Tab: `ALL_DAYS`, `auswBlock(d)` (der Auswertungs-Bereich) und `selectAuswertungDays(d, tage)` (Tages-Auswahl per Klick) - bis vor Kurzem in mehreren Testdateien einzeln dupliziert. Für die beiden Scroll-Anker-Tests (Künstler/Programm) außerdem `mockRowLayout()`, ein gemeinsames Layout-Mock für gleichförmige Zeilenhöhen (siehe dort für Details). Ebenfalls zentralisiert: `refHaversineMeters()`/`refFormatMeters()` (unabhängige Referenz-Implementierung für die Wegstrecke-Tests), `activeDays()` (aktive Tage im Programm-Filter) und `namesInList()` (Künstlernamen in der Programm-Liste). Alle 35 Testdateien oben nutzen diese Helfer bereits
   (Migration in 8 Runden abgeschlossen) - Boilerplate wurde dabei um
   durchschnittlich ca. 43 % pro Datei reduziert, die eigentliche Prüf-Logik
   blieb inhaltlich unverändert.

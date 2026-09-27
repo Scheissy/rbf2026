@@ -1,4 +1,4 @@
-const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
+const { loadApp, reloadWithState, createChecker, auswBlock: block } = require('./test-helpers');
 
 // Testdaten (rbf-data.test.js), nid -> Tag / Location:
 //  1 Nova Frequenz Mi Docks | 4 Rosa Mercur Do Docks | 10 Nordlicht Prozession Sa Docks
@@ -8,7 +8,6 @@ const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
 //        2 EINGETRAGENEN Dauern (40+80)/2=60; Bewertungen 3★+5★ (2 von 3 bewertet) -> Summe 8, Ø 4.0
 // Molotow: 2 Besuche, Dauern 20+0, Summe 20, Ø nur über 1 Dauer = 20; Bewertung 5★ (nur 1) -> Summe 5, Ø 5.0
 
-const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
 const sortBtn = (d, mode) => d.querySelector(`.ausw-sort-btn[data-sort="${mode}"]`);
 const aggBtn = (d, agg) => d.querySelector(`.ausw-sort-btn[data-agg="${agg}"]`);
 const aggBtns = d => [...d.querySelectorAll('.ausw-sort-btn[data-agg]')];

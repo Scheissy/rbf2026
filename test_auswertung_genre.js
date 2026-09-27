@@ -1,11 +1,10 @@
-const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
+const { loadApp, reloadWithState, createChecker, auswBlock: block } = require('./test-helpers');
 
 // Testdaten (rbf-data.test.js), nid -> Künstler/Genre:
 //  1 Nova Frequenz "Electro / Pop" (Mi) | 4 Rosa Mercur "Pop" (Do)
 //  2 Stahl & Beton "Techno" (Mi)        | 11 DJ Mitternacht "Techno / House" (Sa)
 //  evt-1 RBF Podcast Live (Sonstiges-Event, kein Genre)
 
-const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
 const genreRow = (d, name) => [...block(d).querySelectorAll('.ausw-genre')].find(r => r.querySelector('.ausw-loc-head > span:first-child').textContent === name);
 const genreNames = d => [...block(d).querySelectorAll('.ausw-genre > .ausw-loc-head > span:first-child')].map(e => e.textContent).join(' | ');
 const kpis = d => [...block(d).querySelectorAll('.ausw-kpi')].slice(0, 3).map(k => k.querySelector('.ausw-kpi-val').textContent);

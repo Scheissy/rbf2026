@@ -42,7 +42,6 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .topbar-right { display: flex; gap: 8px; }
 
 /* TABS */
-.tabbar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .tab { flex: 1; padding: 10px 4px; text-align: center; font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s; user-select: none; }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
@@ -207,7 +206,6 @@ button.filter { cursor: pointer; white-space: nowrap; }
 .prog-detail-label { width: 70px; flex-shrink: 0; color: var(--text3); }
 .prog-detail-link { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--accent); text-decoration: none; }
 .prog-detail-link-btn { display: inline-block; font-size: 12px; color: var(--accent); background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; }
-.prog-star-group { font-size: 10px; color: var(--text3); display: flex; align-items: center; gap: 3px; }
 .prog-mini-star { font-size: 11px; color: var(--text3); }
 .prog-mini-star.on { color: var(--accent); }
 .prog-mini-star.half { background: linear-gradient(90deg, var(--accent) 50%, var(--text3) 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -1278,69 +1276,60 @@ function auswWalkLegLineHTML(leg) {
   </div>`;
 }
 
-function auswertungBlockHTML(title, id, entries) {
-  const s = auswertungStats(entries);
-  let body;
-  if (!s.visitedCount) {
-    body = '<div class="ausw-empty">Noch keine besuchten Auftritte.</div>';
-  } else {
-    const mode = auswertungSortMode();
-    const agg = auswertungAggMode(mode); // nur bei 'duration' nicht null
-    // Metrik je Modus+Aggregation, für Balken UND Anzeige einheitlich verwendet -
-    // gilt gleichermaßen für Locations UND Genres (identische Feldstruktur).
-    const metricOf = l => {
-      if (mode === 'duration') return agg === 'avg' ? (l.durationCount ? l.minutes / l.durationCount : null) : l.minutes;
-      if (mode === 'rating') return l.avgRating;
-      return l.count;
-    };
-    // Balken: bei "Bewertung" ist die Skala fix (1-5 Sterne) -> absolute Position
-    // auf dieser Skala. Bei Häufigkeit und Dauer (beide Varianten) gibt es keine
-    // feste Obergrenze, der Balken ist daher relativ zum jeweils Erstplatzierten
-    // DER EIGENEN Liste (Locations und Genres haben getrennte Höchstwerte).
-    const isAbsoluteRatingBar = mode === 'rating';
-    const makeBarPct = list => {
-      const barMax = isAbsoluteRatingBar ? null : (list.length ? (metricOf(list[0]) || 0) : 0);
-      return l => {
-        if (isAbsoluteRatingBar) return l.avgRating === null ? 0 : Math.round(l.avgRating / 5 * 100);
-        const v = metricOf(l);
-        return (barMax > 0 && v) ? Math.round(v / barMax * 100) : 0;
-      };
-    };
-    // Eine Zeile (Location ODER Genre) - identisches Markup, nur der Name und
-    // die äußere Klasse (für die Zuordnung zum jeweiligen Abschnitt) wechseln.
-    const rowHTML = (item, nameField, outerClass, barPct) => {
-      const meta = mode === 'rating'
-        ? (item.ratingCount > 0 ? `${item.ratingCount}×` : '')
-        : mode === 'duration'
-          ? (agg === 'avg' ? (item.durationCount > 0 ? `${item.durationCount}×` : '') : `${item.count}×`)
-          : (item.minutes > 0 ? formatDuration(item.minutes) : '');
-      const main = mode === 'rating'
-        ? (item.avgRating === null ? '–' : item.avgRating.toFixed(1))
-        : mode === 'duration'
-          ? (agg === 'avg' ? (item.durationCount > 0 ? formatDuration(Math.round(item.minutes / item.durationCount)) : '–') : (item.minutes > 0 ? formatDuration(item.minutes) : '–'))
-          : `${item.count}×`;
-      return `<div class="${outerClass}" data-count="${item.count}" data-minutes="${item.minutes}" data-avg-rating="${item.avgRating === null ? '' : item.avgRating}">
-        <div class="ausw-loc-head" onclick="toggleAuswDetail(this)"><span>${escapeHtml(item[nameField])}</span><span><span class="ausw-loc-meta">${meta}</span><span class="ausw-loc-main">${main}</span><span class="ausw-expand-arrow">▸</span></span></div>
-        <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(item)}%"></div></div>
-        <div class="ausw-expand-detail collapsed">${item.entries.map(auswEntryLineHTML).join('')}</div>
-      </div>`;
-    };
-    const kpi = (val, label, attrs = '') => `<div class="ausw-kpi"${attrs}><div class="ausw-kpi-val">${val}</div><div class="ausw-kpi-label">${label}</div></div>`;
-    const walk = walkStats(entries);
-    const walkLabel = { none: 'Strecke', walk: 'Fußweg', air: 'Luftlinie', mixed: 'Weg (teils Luftlinie)' }[walk.kind];
-    const walkNote = walk.skipped > 0
-      ? `<div class="ausw-note">ℹ️ ${walk.skipped === 1 ? '1 besuchter Auftritt ist' : `${walk.skipped} besuchte Auftritte sind`} (ohne Uhrzeit oder Koordinaten) in der Strecke nicht enthalten.</div>`
-      : '';
-    const locBarPct = makeBarPct(s.locations);
-    const genreBarPct = makeBarPct(s.genres);
-    body = `<div class="ausw-kpis">
+// Eine Zeile (Location ODER Genre) - identisches Markup, nur der Name und
+// die äußere Klasse (für die Zuordnung zum jeweiligen Abschnitt) wechseln.
+function auswRowHTML(item, nameField, outerClass, barPct, mode, agg) {
+  const meta = mode === 'rating'
+    ? (item.ratingCount > 0 ? `${item.ratingCount}×` : '')
+    : mode === 'duration'
+      ? (agg === 'avg' ? (item.durationCount > 0 ? `${item.durationCount}×` : '') : `${item.count}×`)
+      : (item.minutes > 0 ? formatDuration(item.minutes) : '');
+  const main = mode === 'rating'
+    ? (item.avgRating === null ? '–' : item.avgRating.toFixed(1))
+    : mode === 'duration'
+      ? (agg === 'avg' ? (item.durationCount > 0 ? formatDuration(Math.round(item.minutes / item.durationCount)) : '–') : (item.minutes > 0 ? formatDuration(item.minutes) : '–'))
+      : `${item.count}×`;
+  return `<div class="${outerClass}" data-count="${item.count}" data-minutes="${item.minutes}" data-avg-rating="${item.avgRating === null ? '' : item.avgRating}">
+    <div class="ausw-loc-head" onclick="toggleAuswDetail(this)"><span>${escapeHtml(item[nameField])}</span><span><span class="ausw-loc-meta">${meta}</span><span class="ausw-loc-main">${main}</span><span class="ausw-expand-arrow">▸</span></span></div>
+    <div class="ausw-bar"><div class="ausw-bar-fill" style="width:${barPct(item)}%"></div></div>
+    <div class="ausw-expand-detail collapsed">${item.entries.map(auswEntryLineHTML).join('')}</div>
+  </div>`;
+}
+// Balken-Prozentsatz für eine ganze Liste (Locations ODER Genres, je mit
+// eigenem Höchstwert) - siehe auswRowHTML für die Erklärung der Skalen.
+function auswMakeBarPct(list, mode, agg) {
+  const metricOf = l => {
+    if (mode === 'duration') return agg === 'avg' ? (l.durationCount ? l.minutes / l.durationCount : null) : l.minutes;
+    if (mode === 'rating') return l.avgRating;
+    return l.count;
+  };
+  const isAbsoluteRatingBar = mode === 'rating';
+  const barMax = isAbsoluteRatingBar ? null : (list.length ? (metricOf(list[0]) || 0) : 0);
+  return l => {
+    if (isAbsoluteRatingBar) return l.avgRating === null ? 0 : Math.round(l.avgRating / 5 * 100);
+    const v = metricOf(l);
+    return (barMax > 0 && v) ? Math.round(v / barMax * 100) : 0;
+  };
+}
+// Kennzahlen-Kacheln + Strecke-Hinweis, ganz oben im Block.
+function auswKpisHTML(s, walk) {
+  const kpi = (val, label, attrs = '') => `<div class="ausw-kpi"${attrs}><div class="ausw-kpi-val">${val}</div><div class="ausw-kpi-label">${label}</div></div>`;
+  const walkLabel = { none: 'Strecke', walk: 'Fußweg', air: 'Luftlinie', mixed: 'Weg (teils Luftlinie)' }[walk.kind];
+  const walkNote = walk.skipped > 0
+    ? `<div class="ausw-note">ℹ️ ${walk.skipped === 1 ? '1 besuchter Auftritt ist' : `${walk.skipped} besuchte Auftritte sind`} (ohne Uhrzeit oder Koordinaten) in der Strecke nicht enthalten.</div>`
+    : '';
+  return `<div class="ausw-kpis">
         ${kpi(s.visitedCount, 'Auftritte besucht')}
         ${kpi(s.totalMinutes > 0 ? formatDuration(s.totalMinutes) : '–', 'Zeit vor Ort')}
         ${kpi(s.avgRating !== null ? s.avgRating.toFixed(1) : '–', 'Ø Bewertung')}
         ${kpi(walk.legs > 0 ? formatMeters(walk.meters) : '–', walkLabel, ` data-walk-kind="${walk.kind}"`)}
       </div>
-      ${walkNote}
-      <div class="ausw-sort"><span class="ausw-sort-label">📍 Locations/Genres sortieren nach</span>
+      ${walkNote}`;
+}
+// Sortier-Umschalter (Häufigkeit/Dauer/Bewertung + ggf. Summe/Durchschnitt) -
+// steht direkt vor den Locations, die er (zusammen mit den Genres) steuert.
+function auswSortTogglesHTML(mode, agg) {
+  return `<div class="ausw-sort"><span class="ausw-sort-label">📍 Locations/Genres sortieren nach</span>
         <div class="ausw-sort-btns">
           <button class="ausw-sort-btn${mode === 'count' ? ' active' : ''}" data-sort="count" onclick="setAuswertungSort('count')">Häufigkeit</button>
           <button class="ausw-sort-btn${mode === 'duration' ? ' active' : ''}" data-sort="duration" onclick="setAuswertungSort('duration')">Dauer</button>
@@ -1351,20 +1340,24 @@ function auswertungBlockHTML(title, id, entries) {
         <div class="ausw-sort-btns">
           <button class="ausw-sort-btn${agg === 'sum' ? ' active' : ''}" data-agg="sum" onclick="setAuswertungAgg('sum')">Summe</button>
           <button class="ausw-sort-btn${agg === 'avg' ? ' active' : ''}" data-agg="avg" onclick="setAuswertungAgg('avg')">Durchschnitt</button>
-        </div></div>` : ''}
-      <div class="ausw-sub">📍 Locations</div>
-      <div class="ausw-loc-list">${s.locations.map(l => rowHTML(l, 'location', 'ausw-loc', locBarPct)).join('')}</div>
-      <div class="ausw-sub">🎵 Genres</div>
-      ${s.genres.length === 0
-        ? '<div class="ausw-empty">Keine Genre-Angaben vorhanden.</div>'
-        : `<div class="ausw-genre-list">${s.genres.map(g => rowHTML(g, 'genre', 'ausw-genre', genreBarPct)).join('')}</div>`}
-      <div class="ausw-sub">⭐ Bewertungsverteilung</div>
-      ${s.ratingCount === 0
-        ? '<div class="ausw-empty">Noch keine Bewertungen abgegeben.</div>'
-        : `<div class="ausw-dist-list">${[5, 4, 3, 2, 1].map(n => {
-            const c = s.ratingDist[n - 1];
-            const distMax = Math.max(...s.ratingDist);
-            return `<div class="ausw-dist-entry">
+        </div></div>` : ''}`;
+}
+// Ein aggregierter Abschnitt (Locations ODER Genres) - Überschrift plus
+// entweder die Zeilenliste oder eine Leer-Meldung.
+function auswGroupSectionHTML(heading, emptyMsg, listClass, list, nameField, outerClass, mode, agg) {
+  if (list.length === 0) return `<div class="ausw-sub">${heading}</div>\n      <div class="ausw-empty">${emptyMsg}</div>`;
+  const barPct = auswMakeBarPct(list, mode, agg);
+  return `<div class="ausw-sub">${heading}</div>
+      <div class="${listClass}">${list.map(item => auswRowHTML(item, nameField, outerClass, barPct, mode, agg)).join('')}</div>`;
+}
+// Bewertungsverteilung (5 -> 1 Sterne), jede Stufe mit Anzahl-Balken und
+// (falls > 0 Einträge) aufklappbarer Detail-Liste.
+function auswRatingDistHTML(s) {
+  if (s.ratingCount === 0) return `<div class="ausw-sub">⭐ Bewertungsverteilung</div>\n      <div class="ausw-empty">Noch keine Bewertungen abgegeben.</div>`;
+  const distMax = Math.max(...s.ratingDist);
+  const rows = [5, 4, 3, 2, 1].map(n => {
+    const c = s.ratingDist[n - 1];
+    return `<div class="ausw-dist-entry">
               <div class="ausw-dist-row" data-stars="${n}" data-count="${c}" onclick="${c > 0 ? 'toggleAuswDetail(this)' : ''}">
                 <span class="ausw-dist-star">${n} ★</span>
                 <div class="ausw-dist-bar-wrap"><div class="ausw-bar"><div class="ausw-bar-fill" style="width:${distMax > 0 ? Math.round(c / distMax * 100) : 0}%"></div></div></div>
@@ -1373,11 +1366,38 @@ function auswertungBlockHTML(title, id, entries) {
               </div>
               ${c > 0 ? `<div class="ausw-expand-detail collapsed">${s.ratingEntries[n - 1].map(auswEntryLineHTML).join('')}</div>` : ''}
             </div>`;
-          }).join('')}</div>`}
-      <div class="ausw-sub">🚶 Größte Wege</div>
-      ${walk.legs === 0
-        ? '<div class="ausw-empty">Keine Wege berechenbar.</div>'
-        : `<div class="ausw-walklegs-list">${walk.legList.slice().sort((a, b) => b.meters - a.meters || dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.to.time) - timeSortValue(b.to.time)).slice(0, 5).map(auswWalkLegLineHTML).join('')}</div>`}`;
+  }).join('');
+  return `<div class="ausw-sub">⭐ Bewertungsverteilung</div>
+      <div class="ausw-dist-list">${rows}</div>`;
+}
+// Die 5 größten einzelnen Wegstrecken (siehe walkStats()) - steht bewusst am
+// Ende des Blocks, damit die Zahlen (Locations/Genres/Bewertung) zuerst kommen.
+function auswWalkLegsHTML(walk) {
+  if (walk.legs === 0) return `<div class="ausw-sub">🚶 Größte Wege</div>\n      <div class="ausw-empty">Keine Wege berechenbar.</div>`;
+  const top5 = walk.legList.slice()
+    .sort((a, b) => b.meters - a.meters || dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.to.time) - timeSortValue(b.to.time))
+    .slice(0, 5);
+  return `<div class="ausw-sub">🚶 Größte Wege</div>
+      <div class="ausw-walklegs-list">${top5.map(auswWalkLegLineHTML).join('')}</div>`;
+}
+
+function auswertungBlockHTML(title, id, entries) {
+  const s = auswertungStats(entries);
+  let body;
+  if (!s.visitedCount) {
+    body = '<div class="ausw-empty">Noch keine besuchten Auftritte.</div>';
+  } else {
+    const mode = auswertungSortMode();
+    const agg = auswertungAggMode(mode); // nur bei 'duration' nicht null
+    const walk = walkStats(entries);
+    body = [
+      auswKpisHTML(s, walk),
+      auswSortTogglesHTML(mode, agg),
+      auswGroupSectionHTML('📍 Locations', 'Keine Locations vorhanden.', 'ausw-loc-list', s.locations, 'location', 'ausw-loc', mode, agg),
+      auswGroupSectionHTML('🎵 Genres', 'Keine Genre-Angaben vorhanden.', 'ausw-genre-list', s.genres, 'genre', 'ausw-genre', mode, agg),
+      auswRatingDistHTML(s),
+      auswWalkLegsHTML(walk),
+    ].join('\n      ');
   }
   return `<div class="io-section ausw-block" data-ausw="${escapeHtml(id)}"><div class="io-section-title">${escapeHtml(title)}</div>${body}</div>`;
 }
@@ -1751,30 +1771,56 @@ function renderKuenstlerPreservingScroll() {
 // sichtbaren Bereich gescrollt. Ist er jetzt rausgefiltert, wird bewusst ganz
 // nach oben gescrollt - ein geänderter Filter zeigt dann die neue Ergebnis-
 // liste von Anfang an, statt an einer für die neue Liste beliebigen Stelle.
-function renderKuenstlerPreservingAnchor() {
-  const list = document.getElementById('artistList');
+// Gemeinsames Scroll-Anker-Muster für Künstler- UND Programm-Übersicht: merkt
+// sich den ersten sichtbaren Eintrag VOR dem Neu-Rendern über einen stabilen
+// Schlüssel (nicht über die Position - die kann sich durch einen Filter
+// ändern), rendert neu, und richtet die Scroll-Position danach wieder exakt
+// an diesem Eintrag aus. Ist der Anker selbst nicht mehr vorhanden, kann
+// optional findNeighborKeys(anchorKey) eine Liste von Ersatz-Schlüsseln
+// liefern (der Reihe nach probiert, erster Treffer gewinnt) - ohne diesen
+// Parameter (Künstler-Übersicht) wird stattdessen ganz nach oben gescrollt.
+//
+//   listId:          ID des scrollenden Containers
+//   isRowEl(el):     welche Kinder des Containers überhaupt als "Zeile"
+//                    zählen (z.B. Tages-Header ausschließen)
+//   keyOf(el):       Element -> stabiler Schlüssel, unabhängig von der Position
+//   renderFn():      die eigentliche, ungeschützte Render-Funktion
+//   findNeighborKeys(anchorKey): optional, siehe oben
+function preserveScrollAnchor(listId, isRowEl, keyOf, renderFn, findNeighborKeys) {
+  const list = document.getElementById(listId);
   const listRect = list.getBoundingClientRect();
-  let anchorName = null, anchorOffset = 0;
+  let anchorKey = null, anchorOffset = 0;
   for (const item of list.children) {
-    if (!item.id || !item.id.startsWith('item-')) continue;
+    if (!isRowEl(item)) continue;
     const r = item.getBoundingClientRect();
     if (r.bottom > listRect.top) {
-      anchorName = item.id.slice(5);
+      anchorKey = keyOf(item);
       anchorOffset = r.top - listRect.top;
       break;
     }
   }
-  render();
-  if (anchorName) {
-    const newItem = document.getElementById(`item-${anchorName}`);
-    if (newItem) {
-      const newListRect = list.getBoundingClientRect();
-      const newR = newItem.getBoundingClientRect();
-      list.scrollTop += (newR.top - newListRect.top) - anchorOffset;
-      return;
+  renderFn();
+  const findItem = key => [...list.children].find(el => isRowEl(el) && keyOf(el) === key);
+  let target = anchorKey ? findItem(anchorKey) : null;
+  if (!target && anchorKey && findNeighborKeys) {
+    for (const key of findNeighborKeys(anchorKey)) {
+      target = findItem(key);
+      if (target) break;
     }
   }
+  if (target) {
+    const newListRect = list.getBoundingClientRect();
+    const newR = target.getBoundingClientRect();
+    list.scrollTop += (newR.top - newListRect.top) - anchorOffset;
+    return;
+  }
   list.scrollTop = 0;
+}
+function renderKuenstlerPreservingAnchor() {
+  preserveScrollAnchor('artistList',
+    el => el.id && el.id.startsWith('item-'),
+    el => el.id.slice(5),
+    render);
 }
 function setRating(name, field, val) {
   if (!dataMap[name]) return;
@@ -2924,7 +2970,6 @@ const progGenreModalApi = makeMultiSelectFilter({
   toggleFnName: 'toggleProgGenreSelection', removeChipFnName: 'removeProgGenreChip', resetFnName: 'resetProgGenreFilter',
   onChange: () => renderProg()
 });
-function renderProgGenreModalList() { progGenreModalApi.render(); }
 function toggleProgGenreSelection(g) { progGenreModalApi.toggle(g); }
 function removeProgGenreChip(g) { progGenreModalApi.removeChip(g); }
 function resetProgGenreFilter() { progGenreModalApi.reset(); }
@@ -3162,51 +3207,39 @@ function renderProgCore() {
 // jede Filter-UND Status-Änderung (Bewertung, Ziel-Flag, Ausblenden, ...) über
 // diese eine Funktion läuft, profitieren alle Aufrufer automatisch - ohne
 // jede einzelne Stelle im Code einzeln umstellen zu müssen.
+// Ersetzt die frühere direkte Programm-Liste-Renderfunktion: hält die
+// Scroll-Position am selben Auftritt fest, auch wenn sich durch eine
+// Filteränderung die Zusammensetzung der Liste ändert (siehe
+// preserveScrollAnchor() oben). Wird der Anker selbst herausgefiltert, sucht
+// findNeighborKeys() abwechselnd einen späteren und einen früheren zeitlichen
+// Nachbarn, bis einer gefunden wird, der die neuen Filter noch erfüllt - so
+// bleibt immer ein Eintrag "aus der zeitlichen Umgebung" sichtbar, statt ganz
+// nach oben zu springen. Da praktisch jede Filter- UND Status-Änderung
+// (Bewertung, Ziel-Flag, Ausblenden, ...) über diese eine Funktion läuft,
+// profitieren alle Aufrufer automatisch - ohne jede einzelne Stelle im Code
+// einzeln umstellen zu müssen.
 function renderProg() {
-  const list = document.getElementById('progList');
-  const listRect = list.getBoundingClientRect();
-  let anchorSkey = null, anchorOffset = 0;
-  for (const item of list.children) {
-    if (!item.classList || !item.classList.contains('prog-item')) continue;
-    const r = item.getBoundingClientRect();
-    if (r.bottom > listRect.top) {
-      anchorSkey = item.dataset.skey;
-      anchorOffset = r.top - listRect.top;
-      break;
-    }
-  }
-  // Chronologische Referenzreihenfolge (identisch zur Sortierung in
-  // renderProgCore, aber bewusst über ALLE Einträge statt der gefilterten
-  // Liste) - dient nur dazu, bei rausgefiltertem Anker den zeitlich nächsten
-  // NOCH sichtbaren Nachbarn zu finden, unabhängig davon, welcher Filter sich
-  // gerade geändert hat.
-  const chronological = allProgEntries().slice()
-    .sort((a, b) => dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.time) - timeSortValue(b.time) || a.name.localeCompare(b.name));
-  const anchorIndex = anchorSkey ? chronological.findIndex(a => showKey(a) === anchorSkey) : -1;
-
-  renderProgCore();
-
-  const findItem = skey => [...list.children].find(el => el.classList && el.classList.contains('prog-item') && el.dataset.skey === skey);
-  let target = anchorSkey ? findItem(anchorSkey) : null;
-  // Anker selbst wurde herausgefiltert: abwechselnd einen späteren und einen
-  // früheren zeitlichen Nachbarn probieren, bis einer gefunden wird, der die
-  // neuen Filter noch erfüllt - so bleibt immer ein Eintrag "aus der
-  // zeitlichen Umgebung" sichtbar, statt ganz nach oben zu springen.
-  if (!target && anchorIndex !== -1) {
-    for (let dist = 1; dist < chronological.length && !target; dist++) {
-      const after = chronological[anchorIndex + dist];
-      const before = chronological[anchorIndex - dist];
-      if (after) target = findItem(showKey(after));
-      if (!target && before) target = findItem(showKey(before));
-    }
-  }
-  if (target) {
-    const newListRect = list.getBoundingClientRect();
-    const newR = target.getBoundingClientRect();
-    list.scrollTop += (newR.top - newListRect.top) - anchorOffset;
-    return;
-  }
-  list.scrollTop = 0;
+  preserveScrollAnchor('progList',
+    el => el.classList && el.classList.contains('prog-item'),
+    el => el.dataset.skey,
+    renderProgCore,
+    anchorKey => {
+      // Chronologische Referenzreihenfolge (identisch zur Sortierung in
+      // renderProgCore, aber bewusst über ALLE Einträge statt der gefilterten
+      // Liste) - unabhängig davon, welcher Filter sich gerade geändert hat.
+      const chronological = allProgEntries().slice()
+        .sort((a, b) => dayIndex(a.day) - dayIndex(b.day) || timeSortValue(a.time) - timeSortValue(b.time) || a.name.localeCompare(b.name));
+      const anchorIndex = chronological.findIndex(a => showKey(a) === anchorKey);
+      if (anchorIndex === -1) return [];
+      const keys = [];
+      for (let dist = 1; dist < chronological.length; dist++) {
+        const after = chronological[anchorIndex + dist];
+        const before = chronological[anchorIndex - dist];
+        if (after) keys.push(showKey(after));
+        if (before) keys.push(showKey(before));
+      }
+      return keys;
+    });
 }
 
 function resetAuftritteToDefault() {

@@ -1,4 +1,4 @@
-const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
+const { loadApp, reloadWithState, createChecker, ALL_DAYS, auswBlock: block, selectAuswertungDays: selectDays } = require('./test-helpers');
 
 // Testdaten (rbf-data.test.js), nid -> Tag / Location:
 //  1 Docks Mi | 2 Molotow Mi | 3 Prinzenbar Do | 7 Uebel & Gefährlich Fr
@@ -12,16 +12,6 @@ const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
 //   Docks 45, Fischauktionshalle 0  (alphabetisch wäre Docks/Fischauktionshalle VOR Prinzenbar!)
 // Erwartung Dauer: Prinzenbar 105, Uebel 105 (Gleichstand -> Name), Molotow 45 (2x) vor Docks 45 (1x), Fischauktionshalle 0
 
-const ALL_DAYS = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
-const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
-// Wählt gezielt Tage aus (Klick-Simulation) - der bisherige "Tages-Block" gibt es
-// nicht mehr, stattdessen filtert die EINE Übersicht auf die gewählten Tage.
-function selectDays(d, wantedDays) {
-  ALL_DAYS.forEach(day => {
-    const dayBtn = [...d.querySelectorAll('.ausw-day-btn')].find(b => b.dataset.day === day);
-    if (dayBtn.classList.contains('active') !== wantedDays.includes(day)) dayBtn.click();
-  });
-}
 const rows = d => [...block(d).querySelectorAll('.ausw-loc')].map(r => ({
   name: r.querySelector('.ausw-loc-head > span:first-child').textContent,
   count: +r.getAttribute('data-count'),

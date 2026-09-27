@@ -1,4 +1,4 @@
-const { loadApp, createChecker } = require('./test-helpers');
+const { loadApp, createChecker, ALL_DAYS, auswBlock: block, selectAuswertungDays: selectDays, refHaversineMeters: air, refFormatMeters: km } = require('./test-helpers');
 
 // Eigene Testdaten: echte Koordinaten aus dem Reeperbahn-Gelände, damit die
 // erwarteten Luftlinien-Werte unabhängig (hier im Test) nachgerechnet werden.
@@ -36,22 +36,8 @@ function autoFixAuftritte() {} function validateAuftritte() {} function updateVa
 `;
 
 // Unabhängige Referenz-Implementierung (nicht die der App!).
-function air(a, b) {
-  const R = 6371000, r = x => x * Math.PI / 180;
-  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 const leg = (x, y) => Math.round(air(COORDS[x], COORDS[y]));
-const km = m => m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
 
-const ALL_DAYS = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
-function selectDays(d, wantedDays) {
-  ALL_DAYS.forEach(day => {
-    const dayBtn = [...d.querySelectorAll('.ausw-day-btn')].find(b => b.dataset.day === day);
-    if (dayBtn.classList.contains('active') !== wantedDays.includes(day)) dayBtn.click();
-  });
-}
-const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
 const walkKpi = d => block(d).querySelector('.ausw-kpi[data-walk-kind]');
 const walkVal = d => { const k = walkKpi(d); return k && k.querySelector('.ausw-kpi-val').textContent; };
 const walkLabel = d => { const k = walkKpi(d); return k && k.querySelector('.ausw-kpi-label').textContent; };

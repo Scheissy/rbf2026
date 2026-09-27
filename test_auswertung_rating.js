@@ -1,17 +1,9 @@
-const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
+const { loadApp, reloadWithState, createChecker, ALL_DAYS, auswBlock: block, selectAuswertungDays: selectDays } = require('./test-helpers');
 
 // Testdaten (rbf-data.test.js), nid -> Tag / Location:
 //  1 Docks Mi | 2 Molotow Mi | 4 Rosa Mercur Do Docks | 6 Blau Neon Fr Molotow | 7 Uebel & Gefährlich Fr
 //  10 Nordlicht Prozession Sa Docks | 11 DJ Mitternacht Sa Molotow
 
-const ALL_DAYS = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
-const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
-function selectDays(d, wantedDays) {
-  ALL_DAYS.forEach(day => {
-    const dayBtn = [...d.querySelectorAll('.ausw-day-btn')].find(b => b.dataset.day === day);
-    if (dayBtn.classList.contains('active') !== wantedDays.includes(day)) dayBtn.click();
-  });
-}
 const distRows = d => [...block(d).querySelectorAll('.ausw-dist-row')].map(r => ({
   stars: +r.getAttribute('data-stars'), count: +r.getAttribute('data-count'), width: r.querySelector('.ausw-bar-fill').style.width
 }));

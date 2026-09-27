@@ -20,7 +20,13 @@ const { JSDOM, VirtualConsole } = require('jsdom');
 
 const INDEX_HTML_PATH = path.join(__dirname, 'index.html');
 const DEFAULT_DATA_PATH = path.join(__dirname, 'rbf-data.test.js');
-const DEFAULT_INIT_DELAY_MS = 300;
+// App-Initialisierung läuft komplett synchron beim Skript-Parsing (kein
+// DOMContentLoaded/load-Listener, keine Startup-Timer) - die Wartezeit hier
+// ist daher reine Sicherheitsmarge, kein tatsächlich benötigter Init-Vorgang.
+// War früher 300ms (spürbar bei 35+ Testdateien: ganzer Lauf ~76s); 50ms
+// liefen in wiederholten Läufen des kompletten Bestands durchgehend stabil
+// (auch bei 20ms keine Fehlschläge, 50ms als komfortabler Puffer gewählt).
+const DEFAULT_INIT_DELAY_MS = 50;
 
 /**
  * Lädt index.html + eine Testdatendatei (Standard: rbf-data.test.js) in ein
@@ -163,4 +169,74 @@ function createChecker() {
   };
 }
 
-module.exports = { loadApp, reloadWithState, createChecker, INDEX_HTML_PATH, DEFAULT_DATA_PATH };
+// ── Auswertung-Tab: gemeinsame Helfer ────────────────────────────────────────
+// Die vier Festivaltage der Testdaten (rbf-data.test.js), chronologisch.
+// War bis vor Kurzem in mehreren Testdateien identisch dupliziert.
+const ALL_DAYS = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
+
+// Der (seit der dynamischen Tages-Auswahl einzige) Auswertungs-Bereich.
+function auswBlock(d) { return d.querySelector('.ausw-block[data-ausw="auswahl"]'); }
+
+// Setzt die Tages-Auswahl im Auswertung-Tab per simuliertem Klick (nicht
+// direkt appSettings, damit derselbe Weg wie eine echte Nutzung getestet
+// wird). Jeder Klick rendert den gesamten Inhalt neu - Buttons müssen daher
+// nach jedem Klick neu geholt werden (deshalb hier jedes Mal frisch per
+// dataset.day gesucht statt eine Referenz zu behalten).
+function selectAuswertungDays(d, wantedDays) {
+  ALL_DAYS.forEach(day => {
+    const btn = [...d.querySelectorAll('.ausw-day-btn')].find(b => b.dataset.day === day);
+    const isActive = btn.classList.contains('active');
+    const wanted = wantedDays.includes(day);
+    if (isActive !== wanted) btn.click();
+  });
+}
+
+// ── Scroll-Anker-Tests: gemeinsames Layout-Mock ─────────────────────────────
+// jsdom liefert standardmäßig überall Null-Rects (kein echtes Layout) - wir
+// simulieren daher ein einfaches, gleichförmiges Zeilenlayout: jede Zeile, für
+// die isRow(el) zutrifft, ist rowHeight hoch und in DOM-Reihenfolge gestapelt.
+// "scrolledPast" ist die Anzahl an Zeilen, die bereits aus dem sichtbaren
+// Bereich gescrollt sind (Zeile Nr. `scrolledPast`, 0-indiziert, liegt exakt
+// an der Oberkante der Liste). isRow entscheidet zugleich, WELCHE Kinder der
+// Liste überhaupt als Zeile zählen (in der Künstler-Übersicht z.B. nur echte
+// Einträge über ihre id, in der Programm-Übersicht auch die Tages-Header).
+function mockRowLayout(w, listEl, scrolledPast, isRow, opts = {}) {
+  const rowHeight = opts.rowHeight || 50;
+  const listTop = opts.listTop || 100;
+  const width = opts.width || 300;
+  const listHeight = opts.listHeight || 600;
+  w.Element.prototype.getBoundingClientRect = function () {
+    if (this === listEl) return { top: listTop, bottom: listTop + listHeight, left: 0, right: width, width, height: listHeight };
+    if (!isRow(this)) return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 };
+    const rows = [...listEl.children].filter(isRow);
+    const idx = rows.indexOf(this);
+    const top = listTop + (idx - scrolledPast) * rowHeight;
+    return { top, bottom: top + rowHeight, left: 0, right: width, width, height: rowHeight };
+  };
+}
+
+// ── Weitere kleine, mehrfach dupliziert gewesene Helfer ─────────────────────
+// Unabhängige Referenz-Implementierung der Haversine-Formel (NICHT die der
+// App!) - zur Kontrolle von haversineMeters()/walkMeters() in den
+// Wegstrecke-Tests. refFormatMeters folgt demselben Rundungs-/Format-Schema
+// wie formatMeters() in der App, ebenfalls unabhängig nachgebaut.
+function refHaversineMeters(a, b) {
+  const R = 6371000, r = x => x * Math.PI / 180;
+  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function refFormatMeters(m) { return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`; }
+
+// Aktive Tage im Programm-Filter (".day-btn"), z.B. für Reset-/Smart-Default-
+// Tests - nicht zu verwechseln mit der Tages-Auswahl im Auswertung-Tab
+// (".ausw-day-btn", siehe selectAuswertungDays oben).
+function activeDays(d) {
+  return [...d.querySelectorAll('.day-btn')].filter(b => b.classList.contains('active')).map(b => b.dataset.day);
+}
+
+// Künstlernamen in der aktuell gerenderten Programm-Liste, in DOM-Reihenfolge.
+function namesInList(d) {
+  return [...d.querySelectorAll('.prog-name')].map(el => el.textContent);
+}
+
+module.exports = { loadApp, reloadWithState, createChecker, INDEX_HTML_PATH, DEFAULT_DATA_PATH, ALL_DAYS, auswBlock, selectAuswertungDays, mockRowLayout, refHaversineMeters, refFormatMeters, activeDays, namesInList };

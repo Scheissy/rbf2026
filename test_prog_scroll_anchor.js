@@ -1,24 +1,16 @@
-const { loadApp, createChecker } = require('./test-helpers');
+const { loadApp, createChecker, mockRowLayout, namesInList } = require('./test-helpers');
 
 // jsdom liefert standardmäßig überall Null-Rects (kein echtes Layout) - wir
-// simulieren daher ein einfaches, gleichförmiges Zeilenlayout (jedes Kind von
-// #progList, egal ob Tages-Header oder Auftritt, 50px hoch), analog zu
-// test_kuenstler_scroll_anchor.js. "scrolledPast" ist die Anzahl an Zeilen
-// (in DOM-Reihenfolge), die bereits aus dem sichtbaren Bereich gescrollt sind.
+// simulieren daher ein einfaches, gleichförmiges Zeilenlayout über den
+// gemeinsamen mockRowLayout()-Helfer (siehe test-helpers.js): jedes Kind von
+// #progList, egal ob Tages-Header oder Auftritt, ist 50px hoch (Header zählen
+// hier bewusst mit, anders als in der Künstler-Übersicht). "scrolledPast" ist
+// die Anzahl an Zeilen, die bereits aus dem sichtbaren Bereich gescrollt sind.
 function mockLayout(w, d, scrolledPast) {
-  const rowHeight = 50, listTop = 100;
-  const list = d.getElementById('progList');
-  w.Element.prototype.getBoundingClientRect = function () {
-    if (this === list) return { top: listTop, bottom: listTop + 600, left: 0, right: 320, width: 320, height: 600 };
-    if (this.parentElement !== list) return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 };
-    const idx = [...list.children].indexOf(this);
-    const top = listTop + (idx - scrolledPast) * rowHeight;
-    return { top, bottom: top + rowHeight, left: 0, right: 320, width: 320, height: rowHeight };
-  };
+  mockRowLayout(w, d.getElementById('progList'), scrolledPast, el => el.parentElement === d.getElementById('progList'), { width: 320 });
 }
 const progItem = (d, skey) => [...d.getElementById('progList').children].find(el => el.classList.contains('prog-item') && el.dataset.skey === skey);
 const domIndex = (d, skey) => [...d.getElementById('progList').children].indexOf(progItem(d, skey));
-const namesInList = d => [...d.querySelectorAll('.prog-name')].map(el => el.textContent);
 
 async function setup(w0) {
   const { window: w, document: d } = w0 ? { window: w0, document: w0.document } : await loadApp();

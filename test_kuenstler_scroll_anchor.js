@@ -1,26 +1,12 @@
-const { loadApp, createChecker } = require('./test-helpers');
+const { loadApp, createChecker, mockRowLayout } = require('./test-helpers');
 
 // jsdom liefert standardmäßig überall Null-Rects (kein echtes Layout) - wir
-// simulieren daher gezielt ein Layout: jede sichtbare ".artist-item"-Zeile
-// bekommt eine Höhe von 50px, gestapelt in DOM-Reihenfolge. "scrolledPast"
-// Zeilen gelten als bereits aus dem sichtbaren Bereich gescrollt (ihr
-// unteres Ende liegt genau auf/über der Oberkante der Liste).
+// simulieren daher gezielt ein Layout über den gemeinsamen mockRowLayout()-
+// Helfer (siehe test-helpers.js): jede sichtbare ".artist-item"-Zeile bekommt
+// eine Höhe von 50px, gestapelt in DOM-Reihenfolge. "scrolledPast" Zeilen
+// gelten als bereits aus dem sichtbaren Bereich gescrollt.
 function mockLayout(w, d, scrolledPast) {
-  const rowHeight = 50;
-  const listTop = 100; // beliebiger fixer Bezugspunkt für die Liste selbst
-  const list = d.getElementById('artistList');
-  w.Element.prototype.getBoundingClientRect = function () {
-    if (this === list) {
-      return { top: listTop, bottom: listTop + 600, left: 0, right: 300, width: 300, height: 600 };
-    }
-    if (this.id && this.id.startsWith('item-')) {
-      const items = [...list.children].filter(c => c.id && c.id.startsWith('item-'));
-      const idx = items.indexOf(this);
-      const top = listTop + (idx - scrolledPast) * rowHeight;
-      return { top, bottom: top + rowHeight, left: 0, right: 300, width: 300, height: rowHeight };
-    }
-    return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 };
-  };
+  mockRowLayout(w, d.getElementById('artistList'), scrolledPast, el => el.id && el.id.startsWith('item-'));
 }
 
 (async () => {

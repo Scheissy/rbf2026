@@ -1,10 +1,9 @@
-const { loadApp, createChecker } = require('./test-helpers');
+const { loadApp, createChecker, auswBlock: block } = require('./test-helpers');
 
 // Testdaten (rbf-data.test.js), nid -> Tag / Location:
 //  1 Nova Frequenz Mi Docks | 2 Stahl & Beton Mi Molotow | 4 Rosa Mercur Do Docks
 //  6 Blau Neon Fr Molotow | 10 Nordlicht Prozession Sa Docks
 
-const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
 const locRow = (d, name) => [...block(d).querySelectorAll('.ausw-loc')].find(r => r.querySelector('.ausw-loc-head > span:first-child').textContent === name);
 const distEntry = (d, stars) => [...block(d).querySelectorAll('.ausw-dist-row')].find(r => +r.getAttribute('data-stars') === stars).closest('.ausw-dist-entry');
 const detailOf = row => row.querySelector('.ausw-expand-detail');

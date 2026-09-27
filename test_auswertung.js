@@ -1,29 +1,14 @@
-const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
+const { loadApp, reloadWithState, createChecker, ALL_DAYS, auswBlock: block, selectAuswertungDays: selectDays } = require('./test-helpers');
 
 // Testdaten (rbf-data.test.js), nid -> Tag / Location:
 //  1 Nova Frequenz Mi Docks | 2 Stahl & Beton Mi Molotow | 3 Kollektiv Nachtfalter Do Prinzenbar
 //  4 Rosa Mercur Do Docks   | 6 Blau Neon Fr Molotow      | 8 Funkeninsel Sa Fischauktionshalle
 //  9 Lila Oktober Sa Prinzenbar | 10 Nordlicht Prozession Sa Docks
-const ALL_DAYS = ['Mi 16.09', 'Do 17.09', 'Fr 18.09', 'Sa 19.09'];
-
-const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
 const title = d => block(d).querySelector('.io-section-title').textContent;
 const kpis = d => [...block(d).querySelectorAll('.ausw-kpi')].slice(0, 3).map(k => k.querySelector('.ausw-kpi-val').textContent);
-const locNames = d => [...block(d).querySelectorAll('.ausw-loc-head > span:first-child')].map(e => e.textContent).join(' | ');
+const locNames = d => [...block(d).querySelectorAll('.ausw-loc > .ausw-loc-head > span:first-child')].map(e => e.textContent).join(' | ');
 const dayBtns = d => [...d.querySelectorAll('.ausw-day-btn')];
 const activeDayLabels = d => dayBtns(d).filter(b => b.classList.contains('active')).map(b => b.dataset.day);
-// Setzt die Tages-Auswahl per simuliertem Klick (nicht direkt appSettings, damit
-// derselbe Weg wie eine echte Nutzung getestet wird). Jeder Klick rendert den
-// gesamten Inhalt neu - Buttons müssen daher nach jedem Klick neu geholt werden.
-function selectDays(d, wantedDays) {
-  ALL_DAYS.forEach(day => {
-    const btn = dayBtns(d).find(b => b.dataset.day === day);
-    const isActive = btn.classList.contains('active');
-    const wanted = wantedDays.includes(day);
-    if (isActive !== wanted) btn.click();
-  });
-}
-
 (async () => {
   const { window: w, document: d, errors } = await loadApp({ trackErrors: true });
   const t = createChecker();

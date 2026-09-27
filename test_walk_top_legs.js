@@ -1,4 +1,4 @@
-const { loadApp, createChecker } = require('./test-helpers');
+const { loadApp, createChecker, auswBlock: block, refHaversineMeters: air, refFormatMeters: km } = require('./test-helpers');
 
 // Eigene Testdaten: 4 Locations mit echten Koordinaten, 6 Wegstrecken über
 // 2 Tage verteilt - genug, um "Top 5 von 6" (Kappung) UND das gemischte
@@ -42,14 +42,7 @@ const walkScript = `const WALK_DISTANCES = { generated: '2026-01-01', source: 't
   venues: { 'Docks': 0, 'Prinzenbar': 1, 'Molotow': 2 },
   meters: [[0, 100, 700], [100, 0, 700], [700, 700, 0]] };`;
 
-function air(a, b) {
-  const R = 6371000, r = x => x * Math.PI / 180;
-  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-const km = m => m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
 
-const block = d => d.querySelector('.ausw-block[data-ausw="auswahl"]');
 const legLines = d => [...block(d).querySelectorAll('.ausw-walklegs-list .ausw-expand-item')].map(el => el.textContent.replace(/\s+/g, ' ').trim());
 
 (async () => {
