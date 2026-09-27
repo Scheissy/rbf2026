@@ -1,4 +1,4 @@
-const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
+const { loadApp, reloadWithState, createChecker, namesInList: namesInListShared } = require('./test-helpers');
 
 (async () => {
   const { window: w, document: d } = await loadApp();
@@ -10,7 +10,7 @@ const { loadApp, reloadWithState, createChecker } = require('./test-helpers');
   d.getElementById('timeFrom').value = '08:00';
   w.renderProg();
 
-  const namesInList = () => [...d.querySelectorAll('.prog-name')].map(el => el.textContent);
+  const namesInList = () => namesInListShared(d);
   const musicRow = d.getElementById('rowShowMusicEvents');
   const otherRow = d.getElementById('rowShowOtherEvents');
   const settingCb = d.getElementById('settingShowRbfEvents');

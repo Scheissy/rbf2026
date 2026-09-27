@@ -1,8 +1,4 @@
-const { loadApp, createChecker } = require('./test-helpers');
-
-function activeDays(d) {
-  return [...d.querySelectorAll('.day-btn')].filter(b => b.classList.contains('active')).map(b => b.dataset.day);
-}
+const { loadApp, createChecker, activeDays } = require('./test-helpers');
 
 (async () => {
   const { window: w, document: d } = await loadApp();
