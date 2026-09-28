@@ -59,12 +59,35 @@ const { loadApp, createChecker } = require('./test-helpers');
   d.getElementById('fProgPlanned').checked = false;
   w.renderProg();
 
-  // 5) "Filter zurücksetzen" räumt auch den Indikator mit auf.
+  // 5) "Filter zurücksetzen" räumt auch den Indikator mit auf - UND setzt
+  // die Bewertungsfilter tatsächlich zurück (nicht nur den Indikator-Punkt):
+  // geprüft an der WIRKUNG (ein durch den Filter ausgeblendeter Auftritt muss
+  // wieder erscheinen), nicht nur am internen Zustand. Regressionsschutz für
+  // die gemeinsame clearProgFilterState()-Funktion (genutzt von
+  // resetProgFilters() UND jumpToNow(), siehe Fall 6 unten).
   d.getElementById('fProgStatus').value = 'ja';
   w.toggleProgGenreSelection('Pop');
+  w.setProgShowRatingFilter(5); // Nova Frequenz (unbewertet) wird dadurch ausgeblendet
   w.renderProg();
+  t.check('Testvoraussetzung: Auftritt-Bewertungsfilter (5★) blendet den unbewerteten "Nova Frequenz" aus.',
+    !d.getElementById('progList').innerHTML.includes('Nova Frequenz'));
   w.resetProgFilters();
   t.check('"Filter zurücksetzen" entfernt auch den Aktiv-Indikator wieder.', !isDotVisible());
+  t.check('"Filter zurücksetzen" setzt den Auftritt-Bewertungsfilter WIRKLICH zurück ("Nova Frequenz" ist wieder sichtbar), nicht nur optisch den Indikator-Punkt.',
+    d.getElementById('progList').innerHTML.includes('Nova Frequenz'));
+
+  // 6) Derselbe Reset-Kern wird auch beim 2. "Jetzt"-Klick verwendet
+  // (clearProgFilterState()) - muss den Bewertungsfilter ebenso zurücksetzen.
+  // "Jetzt" braucht einen echten Festivaltag, sonst bricht es sofort ab.
+  w.getBerlinNow = () => ({ year: 2026, month: 9, day: 18, hour: 14, minute: 0 });
+  w.setProgShowRatingFilter(5); // Blau Neon (Fr, unbewertet) wird dadurch ausgeblendet
+  w.renderProg();
+  t.check('Testvoraussetzung: Bewertungsfilter erneut aktiv, "Blau Neon" (Fr) ausgeblendet.',
+    !d.getElementById('progList').innerHTML.includes('Blau Neon'));
+  w.jumpToNow(); // 1. Klick: nur Tag/Zeit (springt auf Fr+Sa), Bewertungsfilter bleibt (noch) bestehen
+  w.jumpToNow(); // 2. Klick (bereits auf "jetzt"): setzt die übrigen Filter zurück
+  t.check('Der 2. "Jetzt"-Klick setzt den Auftritt-Bewertungsfilter ebenfalls WIRKLICH zurück ("Blau Neon" ist wieder sichtbar).',
+    d.getElementById('progList').innerHTML.includes('Blau Neon'));
 
   t.finish();
 })();

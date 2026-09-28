@@ -2771,11 +2771,13 @@ function applySmartProgDefaults() {
 // IMMER auf "heute" (ganzer Tag, alle künftigen Tage inklusive), "Jetzt"
 // springt beim 1. Klick nur auf die genaue Uhrzeit (ohne die übrigen Filter
 // anzutasten) und setzt erst beim 2. Klick zusätzlich zurück.
-function resetProgFilters() {
-  const pastDays = getPastFestivalDays();
-  document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', !pastDays.has(b.dataset.day)));
-  document.getElementById('timeFrom').value = '08:00';
-  document.getElementById('timeTo').value = '';
+// Setzt die "echten" Programm-Filter zurück (Location, Genre, Status, Dauer,
+// Ziel, beide Bewertungsfilter) - der gemeinsame Kern von resetProgFilters()
+// und dem 2. Klick von jumpToNow(). Bewusst NICHT enthalten: Tag/Zeit (die
+// behandelt jeder Aufrufer unterschiedlich) sowie "Ausgeblendete anzeigen"
+// und die beiden Event-Sichtbarkeits-Haken (Dauereinstellungen, keine
+// Programm-Filter im engeren Sinn, siehe Kommentar bei jumpToNow()).
+function clearProgFilterState() {
   selectedLocs.clear();
   progSelectedGenres.clear();
   updateProgGenreChips();
@@ -2786,6 +2788,13 @@ function resetProgFilters() {
   renderProgRatingStars();
   progShowRatingFilter = 0;
   renderProgShowRatingStars();
+}
+function resetProgFilters() {
+  const pastDays = getPastFestivalDays();
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.toggle('active', !pastDays.has(b.dataset.day)));
+  document.getElementById('timeFrom').value = '08:00';
+  document.getElementById('timeTo').value = '';
+  clearProgFilterState();
   renderProg();
   toast('Filter zurückgesetzt ✓');
 }
@@ -2824,16 +2833,7 @@ function jumpToNow() {
   toSel.value = '';
 
   if (alreadyAtNow) {
-    selectedLocs.clear();
-    progSelectedGenres.clear();
-    updateProgGenreChips();
-    document.getElementById('fProgStatus').value = '';
-    document.getElementById('fProgDuration').checked = false;
-    document.getElementById('fProgPlanned').checked = false;
-    progRatingFilter = 0;
-    renderProgRatingStars();
-    progShowRatingFilter = 0;
-    renderProgShowRatingStars();
+    clearProgFilterState();
     renderProg();
     toast(`Zu ${ctx.day}, ${ctx.time} Uhr gesprungen + übrige Filter zurückgesetzt ✓`);
   } else {

@@ -18,7 +18,7 @@ mit der Zeit ihren Nutzen.
 | `test_jump_to_now.js` | Zweistufiges "Jetzt"-Verhalten: 1. Klick nur Zeit+Tage (heute + kommende), 2. Klick zusätzlich Reset der übrigen Filter. |
 | `test_jump_to_now_future_scroll.js` | "Jetzt" lässt freies Scrollen in die Zukunft zu: keine Endzeit gesetzt, künftige Tage bleiben aktiv (nicht nur der heutige Tag). |
 | `test_loc_info_modal.js` | ⓘ-Erklärungs-Modal beim Location-Filter (Hinweis auf "Locations verwalten" + Anzeige der aktuell ausgewählten Locations). |
-| `test_prog_filters_indicator.js` | Aktiv-Punkt am "Weitere Filter"-Button (erscheint nur bei eingeklapptem Panel + aktivem "versteckten" Filter, Event-Checkboxen bewusst ausgenommen). |
+| `test_prog_filters_indicator.js` | Aktiv-Punkt am "Weitere Filter"-Button (erscheint nur bei eingeklapptem Panel + aktivem "versteckten" Filter, Event-Checkboxen bewusst ausgenommen). Zusätzlich: "Filter zurücksetzen" UND der 2. "Jetzt"-Klick setzen den Auftritt-Bewertungsfilter WIRKLICH zurück (geprüft an der Wirkung - ein ausgeblendeter Auftritt muss wieder erscheinen - nicht nur am Indikator-Punkt); schützt die gemeinsame `clearProgFilterState()`-Funktion. |
 | `test_prog_genre_filter.js` | Genre-Mehrfachfilter in der Programm-Übersicht (UI, Filterwirkung, Persistenz, Zurücksetzen, Unabhängigkeit vom Künstler-Tab). |
 | `test_rating_badge_move.js` | Bewertungs-Badge (5-Sterne, feste Breite) in `prog-right-col`, Plan-Flag-Button neben der Zeit. |
 | `test_rbf_events_toggle.js` | Globaler Settings-Schalter "RBF-Sonderveranstaltungen" (an/aus wirkt auf Events + die beiden Event-Checkboxen). |
